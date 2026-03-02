@@ -1,0 +1,79 @@
+.fa,
+.fa-brands,
+.fa-regular,
+.fa-solid,
+.fab,
+.far,
+.fas {
+  -moz-osx-font-smoothing: grayscale;
+  -webkit-font-smoothing: antialiased;
+  font-style: normal;
+  font-variant: normal;
+  line-height: 1;
+  text-rendering: auto;
+}
+
+.fa-heart:before          { content: '\f004'; }
+.fa-cart-shopping:before  { content: '\f07a'; }
+.fa-chevron-down:before   { content: '\f078'; }
+.fa-chevron-left:before   { content: '\f053'; }
+.fa-chevron-right:before  { content: '\f054'; }
+.fa-minus:before          { content: '\f068'; }
+.fa-plus:before           { content: '\2b'; }
+.fa-trash:before          { content: '\f1f8'; }
+.fa-eye:before            { content: '\f06e'; }
+.fa-eye-slash:before      { content: '\f070'; }
+.fa-spinner:before        { content: '\f110'; }
+.fa-check:before          { content: '\f00c'; }
+.fa-flag:before           { content: '\f024'; }
+.fa-truck:before          { content: '\f0d1'; }
+.fa-xmark:before          { content: '\f00d'; }
+.fa-magnifying-glass:before { content: '\f002'; }
+
+@font-face {
+  font-family: 'Font Awesome 6 Brands';
+  font-style: normal;
+  font-weight: 400;
+  font-display: block;
+  src:
+    url(fontawesome/fa-brands-400.woff2) format('woff2'),
+    url(fontawesome/fa-brands-400.ttf) format('truetype');
+}
+
+.fa-brands,
+.fab {
+  font-family: 'Font Awesome 6 Brands';
+  font-weight: 400;
+}
+
+@font-face {
+  font-family: 'Font Awesome 6 Pro';
+  font-style: normal;
+  font-weight: 400;
+  font-display: block;
+  src:
+    url(fontawesome/fa-regular-400.woff2) format('woff2'),
+    url(fontawesome/fa-regular-400.ttf) format('truetype');
+}
+
+.fa-regular,
+.far {
+  font-family: 'Font Awesome 6 Pro';
+  font-weight: 400;
+}
+
+@font-face {
+  font-family: 'Font Awesome 6 Pro';
+  font-style: normal;
+  font-weight: 900;
+  font-display: block;
+  src:
+    url(fontawesome/fa-solid-900.woff2) format('woff2'),
+    url(fontawesome/fa-solid-900.ttf) format('truetype');
+}
+
+.fa-solid,
+.fas {
+  font-family: 'Font Awesome 6 Pro';
+  font-weight: 900;
+}

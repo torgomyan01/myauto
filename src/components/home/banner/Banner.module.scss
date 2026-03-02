@@ -1,0 +1,28 @@
+.banner {
+  background: url(/img/banner-bg.jpg);
+  background-size: cover;
+  background-repeat: no-repeat;
+  background-position: center center;
+  padding-top: 80px;
+  padding-bottom: 340px;
+  margin-bottom: 10px;
+
+  @media (max-width: 767px) {
+    padding-top: 50px;
+    padding-bottom: 150px;
+  }
+
+  h1 {
+    font-size: 40px;
+    font-weight: normal;
+    color: white;
+
+    @media (max-width: 767px) {
+      font-size: 24px;
+    }
+  }
+}
+
+.redText {
+  color: #f00;
+}
