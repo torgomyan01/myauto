@@ -21,36 +21,23 @@
 .brandsItems {
   display: grid;
   gap: 20px;
-  grid-template-columns: repeat(8, 1fr);
+  grid-template-columns: repeat(5, 1fr);
 
   @media (max-width: 1200px) {
-    grid-template-columns: repeat(6, 1fr);
-  }
-
-  @media (max-width: 767px) {
     grid-template-columns: repeat(4, 1fr);
   }
 
-  @media (max-width: 475px) {
+  @media (max-width: 966px) {
     grid-template-columns: repeat(3, 1fr);
+  }
+
+  @media (max-width: 700px) {
+    grid-template-columns: repeat(2, 1fr);
     gap: 10px;
   }
-}
 
-.brandsItem {
-  display: flex;
-  border-radius: 50%;
-  overflow: hidden;
-  border: 1px solid rgba(92, 91, 91, 0.05);
-  transition: 0.3s;
-
-  &:hover {
-    border-color: rgba(92, 91, 91, 0.45);
-  }
-
-  img {
-    width: 100%;
-    height: 100%;
-    object-fit: cover;
+  @media (max-width: 463px) {
+    grid-template-columns: repeat(1, 1fr);
+    gap: 10px;
   }
 }

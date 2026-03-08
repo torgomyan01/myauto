@@ -3,7 +3,9 @@
 import { useState } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
+import { signIn } from 'next-auth/react';
 import { ROUTES } from '@/constants/routes';
+import { addToast } from '@heroui/toast';
 
 interface FormState {
   email: string;
@@ -50,11 +52,34 @@ export default function LoginForm() {
     setLoading(true);
     setErrors({});
     try {
-      // TODO: replace with real API call
-      await new Promise((res) => setTimeout(res, 1000));
-      router.push(ROUTES.HOME);
-    } catch {
-      setErrors({ general: 'Неверный логин или пароль' });
+      const result = await signIn('credentials', {
+        redirect: false,
+        email: form.email,
+        password: form.password,
+      });
+
+      if (result?.error) {
+        setErrors({ general: 'Неверный логин или пароль' });
+        addToast({
+          title: 'Ошибка входа',
+          description: 'Неверный логин или пароль',
+          color: 'danger',
+        });
+      } else {
+        addToast({
+          title: 'Добро пожаловать',
+          description: 'Вы успешно вошли в систему',
+          color: 'success',
+        });
+        router.push(ROUTES.HOME);
+      }
+    } catch (error) {
+      setErrors({ general: 'Ошибка входа. Попробуйте снова.' });
+      addToast({
+        title: 'Ошибка входа',
+        description: 'Что-то пошло не так. Попробуйте снова.',
+        color: 'danger',
+      });
     } finally {
       setLoading(false);
     }

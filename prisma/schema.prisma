@@ -3,6 +3,49 @@ generator client {
 }
 
 datasource db {
-  provider = "sqlite"
-  url      = "file:./dev.db"
+  provider = "mysql"
+  url      = env("DATABASE_URL")
+}
+
+model cars {
+  id        Int    @id @default(autoincrement())
+  name      String @db.VarChar(255)
+  parent_id Int?
+}
+
+model user {
+  id         Int         @id @default(autoincrement())
+  email      String      @unique(map: "User_email_key")
+  name       String
+  password   String
+  phone      String?
+  role       user_role   @default(USER)
+  createdAt  DateTime    @default(now())
+  updatedAt  DateTime
+  garageCars GarageCar[]
+}
+
+enum user_role {
+  USER
+  ADMIN
+}
+
+model GarageCar {
+  id         Int      @id @default(autoincrement())
+  user       user     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  userId     Int
+  vin        String   @db.VarChar(32)
+  brand      String?  @db.VarChar(255)
+  model      String?  @db.VarChar(255)
+  year       String?  @db.VarChar(16)
+  type       String?  @db.VarChar(64)
+  markId     String?  @db.VarChar(191)
+  modelId    String?  @db.VarChar(191)
+  modificationId String? @db.VarChar(191)
+  criteria   String?  @db.VarChar(191)
+  criteria64 String?  @db.VarChar(191)
+  image      String?  @db.VarChar(512)
+  createdAt  DateTime @default(now())
+
+  @@unique([userId, vin], map: "GarageCar_user_vin_key")
 }

@@ -5,4 +5,13 @@ export const ROUTES = {
   FORGOT_PASSWORD: '/auth/forgot-password',
   PRODUCT: (id: number | string) => `/product/${id}`,
   CART: '/cart',
+  PROFILE: '/profile',
+  GARAGE: '/profile/garage',
+  CONTACTS: '/contacts',
+  SEARCH: '/search',
+  BRANDS: '/brands',
+  BRANDS_MODELS: '/brands/models',
+  BRAND_MODEL_MODS: '/brands/model',
+  BRAND_MODEL_GROUPS: '/brands/model/groups',
+  BRAND_MODEL_PARTS: '/brands/model/groups/parts',
 } as const;

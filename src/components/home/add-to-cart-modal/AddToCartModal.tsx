@@ -24,15 +24,19 @@ interface AddToCartModalProps {
   product: CartProduct | null;
 }
 
-export default function AddToCartModal({ isOpen, onClose, product }: AddToCartModalProps) {
+export default function AddToCartModal({
+  isOpen,
+  onClose,
+  product,
+}: AddToCartModalProps) {
   const [qty, setQty] = useState(1);
 
   if (!product) return null;
 
   const total = product.price * qty;
 
-  const decrease = () => setQty(q => Math.max(1, q - 1));
-  const increase = () => setQty(q => q + 1);
+  const decrease = () => setQty((q) => Math.max(1, q - 1));
+  const increase = () => setQty((q) => q + 1);
   const remove = () => {
     setQty(1);
     onClose();
@@ -49,7 +53,7 @@ export default function AddToCartModal({ isOpen, onClose, product }: AddToCartMo
       onClose={onClose}
       size="3xl"
       classNames={{
-        base: 'rounded-2xl',
+        base: 'rounded-2xl ',
         header: 'border-b border-gray-100 pb-3',
         footer: 'border-t border-gray-100 pt-3',
       }}
@@ -99,7 +103,9 @@ export default function AddToCartModal({ isOpen, onClose, product }: AddToCartMo
                 >
                   <i className="fa-solid fa-minus text-xs" />
                 </button>
-                <span className="w-6 text-center text-sm font-medium">{qty}</span>
+                <span className="w-6 text-center text-sm font-medium">
+                  {qty}
+                </span>
                 <button
                   onClick={increase}
                   className="w-6 h-6 flex items-center justify-center text-gray-500 hover:text-[#E21321] transition-colors"

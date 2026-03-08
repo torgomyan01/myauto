@@ -3,6 +3,8 @@
 import { useState } from 'react';
 import Link from 'next/link';
 import { ROUTES } from '@/constants/routes';
+import { addToast } from '@heroui/toast';
+import { forgotPassword } from '@/app/actions/auth';
 
 interface FormErrors {
   identifier?: string;
@@ -30,11 +32,24 @@ export default function ForgotPasswordForm() {
     setLoading(true);
     setErrors({});
     try {
-      // TODO: replace with real API call
-      await new Promise((res) => setTimeout(res, 1000));
+      await forgotPassword(identifier);
       setSuccess(true);
-    } catch {
-      setErrors({ general: 'Произошла ошибка. Попробуйте снова.' });
+      addToast({
+        title: 'Письмо отправлено',
+        description: 'Проверьте вашу почту для дальнейших инструкций.',
+        color: 'success',
+      });
+    } catch (error) {
+      const message =
+        error instanceof Error
+          ? error.message
+          : 'Произошла ошибка. Попробуйте снова.';
+      setErrors({ general: message });
+      addToast({
+        title: 'Ошибка',
+        description: message,
+        color: 'danger',
+      });
     } finally {
       setLoading(false);
     }

@@ -9,7 +9,9 @@ export default function Home() {
     <MainTemplate>
       <Banner />
       <Spares />
-      <PopularBrands />
+      <div className="wrapper">
+        <PopularBrands />
+      </div>
       <PopularProducts />
     </MainTemplate>
   );

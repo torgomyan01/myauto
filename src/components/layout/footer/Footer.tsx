@@ -1,6 +1,7 @@
 import Image from 'next/image';
 import Link from 'next/link';
 import styles from './Footer.module.scss';
+import { ROUTES } from '@/constants/routes';
 
 export default function Footer() {
   return (
@@ -16,7 +17,7 @@ export default function Footer() {
           />
           <div className={styles.footerLinks}>
             <Link href="#">О компании</Link>
-            <Link href="#">Контакты</Link>
+            <Link href={ROUTES.CONTACTS}>Контакты</Link>
           </div>
           <div className={styles.footerLinks}>
             <Link href="#">Как пользоваться каталогом</Link>

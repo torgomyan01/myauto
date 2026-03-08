@@ -4,6 +4,9 @@ import { useState } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { ROUTES } from '@/constants/routes';
+import Image from 'next/image';
+import { addToast } from '@heroui/toast';
+import { register } from '@/app/actions/auth';
 
 interface FormState {
   email: string;
@@ -37,6 +40,7 @@ export default function RegisterForm() {
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirm, setShowConfirm] = useState(false);
   const [loading, setLoading] = useState(false);
+  const [success, setSuccess] = useState(false);
 
   const validate = (): boolean => {
     const e: FormErrors = {};
@@ -85,17 +89,47 @@ export default function RegisterForm() {
     handleChange('phone', digits);
   };
 
+  const formatPhone = (value: string) => {
+    const digits = value.replace(/\D/g, '').slice(0, 8);
+    return digits.replace(/(\d{2})(?=\d)/g, '$1 ');
+  };
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!validate()) return;
     setLoading(true);
     setErrors({});
     try {
-      // TODO: replace with real API call
-      await new Promise((res) => setTimeout(res, 1000));
-      router.push(ROUTES.LOGIN);
-    } catch {
-      setErrors({ general: 'Ошибка регистрации. Попробуйте снова.' });
+      await register({
+        email: form.email,
+        name: form.username,
+        password: form.password,
+        phone: form.phone,
+      });
+      setSuccess(true);
+      addToast({
+        title: 'Регистрация успешна',
+        description: 'Теперь вы можете оформлять заказы.',
+        color: 'success',
+      });
+      setForm({
+        email: '',
+        username: '',
+        phone: '',
+        password: '',
+        confirmPassword: '',
+      });
+    } catch (error) {
+      const message =
+        error instanceof Error
+          ? error.message
+          : 'Ошибка регистрации. Попробуйте снова.';
+      setErrors({ general: message });
+      addToast({
+        title: 'Ошибка регистрации',
+        description: message,
+        color: 'danger',
+      });
     } finally {
       setLoading(false);
     }
@@ -107,7 +141,32 @@ export default function RegisterForm() {
         Регистрация
       </h1>
 
-      <form onSubmit={handleSubmit} noValidate className="flex flex-col gap-5">
+      {success ? (
+        <div className="flex flex-col items-center gap-4">
+          <div className="w-14 h-14 rounded-full bg-[#4CAF50] flex items-center justify-center">
+            <i className="fa-solid fa-check text-white text-xl" />
+          </div>
+          <p className="text-lg font-bold text-gray-900 text-center">
+            Вы успешно зарегистрировались.
+          </p>
+          <p className="text-sm text-gray-600 text-center">
+            Теперь вы можете оформлять заказы в системе.
+          </p>
+          <button
+            type="button"
+            onClick={() => router.push(ROUTES.LOGIN)}
+            className="mt-2 w-full h-[48px] bg-[#E21321] hover:bg-[#c41020] text-white font-bold rounded-xl text-base transition-colors"
+          >
+            Перейти ко входу
+          </button>
+        </div>
+      ) : (
+        <>
+          <form
+            onSubmit={handleSubmit}
+            noValidate
+            className="flex flex-col gap-5"
+          >
         {/* Email */}
         <div className="flex flex-col gap-1">
           <label className="text-sm text-gray-500 font-medium">
@@ -152,17 +211,22 @@ export default function RegisterForm() {
             ${errors.phone ? 'border-[#E21321]' : 'border-gray-200 focus-within:border-gray-400'}`}
           >
             <div className="flex items-center gap-2 px-4 border-r border-gray-200 h-full shrink-0">
-              <i className="fa-solid fa-flag text-[#D90012] text-sm" />
+              <Image
+                src="/img/icons/armenain-flag.png"
+                alt="Armenia"
+                width={20}
+                height={20}
+              />
               <span className="text-sm text-gray-500 font-medium">
                 {PHONE_PREFIX}
               </span>
             </div>
             <input
               type="tel"
-              placeholder="XXXXXXXX"
-              value={form.phone}
+              placeholder="XX XX XX XX"
+              value={formatPhone(form.phone)}
               onChange={(e) => handlePhoneInput(e.target.value)}
-              maxLength={8}
+              maxLength={11}
               className="flex-1 h-full px-3 text-sm outline-none bg-transparent rounded-r-xl"
             />
           </div>
@@ -252,17 +316,19 @@ export default function RegisterForm() {
             'Регистрация'
           )}
         </button>
-      </form>
+          </form>
 
-      <p className="text-sm text-center text-gray-600 mt-5">
-        У вас есть учетная запись?{' '}
-        <Link
-          href={ROUTES.LOGIN}
-          className="text-[#E21321] font-medium hover:underline"
-        >
-          Войти
-        </Link>
-      </p>
+          <p className="text-sm text-center text-gray-600 mt-5">
+            У вас есть учетная запись?{' '}
+            <Link
+              href={ROUTES.LOGIN}
+              className="text-[#E21321] font-medium hover:underline"
+            >
+              Войти
+            </Link>
+          </p>
+        </>
+      )}
     </div>
   );
 }
