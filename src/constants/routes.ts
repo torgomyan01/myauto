@@ -14,4 +14,12 @@ export const ROUTES = {
   BRAND_MODEL_MODS: '/brands/model',
   BRAND_MODEL_GROUPS: '/brands/model/groups',
   BRAND_MODEL_PARTS: '/brands/model/groups/parts',
+  ADMIN: '/admin',
+  ADMIN_USERS: '/admin/users',
+  ADMIN_SETTINGS: '/admin/settings',
+  ADD_CAR: '/add/car',
+  ADD_PART: '/add/part',
+  ADD_PART_VERIFY: '/add/part/verify',
+  ADMIN_VERIFICATIONS: '/admin/verifications',
+  ADMIN_LEGAL_ENTITIES: '/admin/legal-entities',
 } as const;

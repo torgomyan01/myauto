@@ -1,6 +1,5 @@
 import MainTemplate from '@/components/layout/main-template/MainTemplate';
-import { getServerSession } from 'next-auth';
-import { authOptions } from '@/app/api/auth/[...nextauth]/route';
+import { getAuthSession } from '@/lib/auth-server';
 import { prisma } from '@/lib/prisma';
 import { redirect } from 'next/navigation';
 import { ROUTES } from '@/constants/routes';
@@ -13,7 +12,7 @@ async function getGarageCars(userId: number) {
 }
 
 export default async function GaragePage() {
-  const session = await getServerSession(authOptions);
+  const session = await getAuthSession();
 
   if (!session?.user) {
     redirect(ROUTES.LOGIN);

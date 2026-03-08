@@ -27,7 +27,7 @@ export default function Footer() {
           </div>
           <div className={styles.footerContacts}>
             <Link href="tel:+37411330222" className={styles.phone}>
-              +374 11-330-222
+              +374 99 737 777
             </Link>
             <span className={styles.address}>г. Ереван, 0019, Айгедзор 5</span>
           </div>

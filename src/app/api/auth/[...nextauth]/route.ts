@@ -1,9 +1,9 @@
-import NextAuth, { type NextAuthOptions } from 'next-auth';
+import NextAuth from 'next-auth/next';
 import Credentials from 'next-auth/providers/credentials';
 import bcrypt from 'bcryptjs';
 import { prisma } from '@/lib/prisma';
 
-export const authOptions: NextAuthOptions = {
+export const authOptions = {
   secret: process.env.NEXTAUTH_SECRET,
   providers: [
     Credentials({
@@ -20,6 +20,7 @@ export const authOptions: NextAuthOptions = {
         });
 
         if (!user || !user.password) return null;
+        if (user.blocked) return null;
 
         const isValid = await bcrypt.compare(
           credentials.password,
@@ -31,32 +32,36 @@ export const authOptions: NextAuthOptions = {
           id: String(user.id),
           email: user.email,
           name: user.name,
+          role: user.role,
         };
       },
     }),
   ],
   session: {
-    strategy: 'jwt',
+    strategy: 'jwt' as const,
   },
   pages: {
     signIn: '/auth/login',
   },
   callbacks: {
-    async jwt({ token, user }) {
+    async jwt({ token, user }: { token: Record<string, unknown>; user?: { id: string; role?: string } }) {
       if (user) {
-        (token as any).id = (user as any).id;
+        token.id = user.id;
+        token.role = user.role;
       }
       return token;
     },
-    async session({ session, token }) {
-      if (session.user && (token as any).id) {
-        (session.user as any).id = (token as any).id;
+    async session({ session, token }: { session: Record<string, unknown> & { user?: Record<string, unknown> }; token: Record<string, unknown> }) {
+      if (session.user && token.id) {
+        (session.user as Record<string, unknown>).id = token.id;
+        (session.user as Record<string, unknown>).role = token.role ?? 'USER';
       }
       return session;
     },
   },
 };
 
-const handler = NextAuth(authOptions);
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+const handler = NextAuth(authOptions as any);
 
 export { handler as GET, handler as POST };

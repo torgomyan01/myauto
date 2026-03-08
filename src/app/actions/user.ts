@@ -1,7 +1,6 @@
 'use server';
 
-import { getServerSession } from 'next-auth';
-import { authOptions } from '@/app/api/auth/[...nextauth]/route';
+import { getAuthSession } from '@/lib/auth-server';
 import { prisma } from '@/lib/prisma';
 
 export interface ProfileUpdateResult {
@@ -14,7 +13,7 @@ export async function updateProfile(data: {
   name: string;
   phone: string;
 }): Promise<ProfileUpdateResult> {
-  const session = await getServerSession(authOptions);
+  const session = await getAuthSession();
 
   if (!session?.user) {
     throw new Error('Не авторизован');

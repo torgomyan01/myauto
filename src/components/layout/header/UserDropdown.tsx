@@ -2,17 +2,21 @@
 
 import Link from 'next/link';
 import { signOut } from 'next-auth/react';
+import type { Session } from 'next-auth';
 import styles from './Header.module.scss';
 import { ROUTES } from '@/constants/routes';
 
 interface UserDropdownProps {
   isOpen: boolean;
   onToggle: () => void;
+  session?: Session | null;
 }
 
 const iconClass = 'fa-solid w-[22px] mr-[15px] text-center text-[18px]';
 
-export default function UserDropdown({ isOpen, onToggle }: UserDropdownProps) {
+export default function UserDropdown({ isOpen, onToggle, session }: UserDropdownProps) {
+  const isAdmin = session?.user?.role === 'ADMIN';
+
   return (
     <div className={styles.user}>
       <button
@@ -30,6 +34,12 @@ export default function UserDropdown({ isOpen, onToggle }: UserDropdownProps) {
       <div
         className={`${styles.basketInfoHide} ${isOpen ? styles.show : ''} z-50`}
       >
+        {isAdmin && (
+          <Link href={ROUTES.ADMIN} onClick={onToggle}>
+            <i className={`${iconClass} fa-shield-halved`} />
+            Админ-панель
+          </Link>
+        )}
         <Link href={ROUTES.PROFILE}>
           <i className={`${iconClass} fa-user`} />
           Личные данные

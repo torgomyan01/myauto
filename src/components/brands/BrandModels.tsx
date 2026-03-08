@@ -55,7 +55,8 @@ export default function BrandModels({ mark, markName }: BrandModelsProps) {
   if (!mark) {
     return (
       <div className="mt-6 text-sm text-red-500">
-        Не заданы параметры марки. Попробуйте перейти на страницу из списка брендов.
+        Не заданы параметры марки. Попробуйте перейти на страницу из списка
+        брендов.
       </div>
     );
   }
@@ -116,6 +117,7 @@ export default function BrandModels({ mark, markName }: BrandModelsProps) {
             const modelUrl = hasMods
               ? `${ROUTES.BRAND_MODEL_MODS}?type=${encodeURIComponent(typeVal)}&mark=${encodeURIComponent(markVal)}&model=${encodeURIComponent(model.id)}&name=${encodeURIComponent(model.name ?? '')}`
               : `${ROUTES.BRAND_MODEL_GROUPS}?type=${encodeURIComponent(typeVal)}&mark=${encodeURIComponent(markVal)}&model=${encodeURIComponent(model.id)}&modification=null&name=${encodeURIComponent(model.name ?? '')}`;
+
             return (
               <Link
                 href={modelUrl}
@@ -161,10 +163,23 @@ export default function BrandModels({ mark, markName }: BrandModelsProps) {
                         </span>
                       </p>
                     )}
-                    {model.modification && (
-                      <p className="text-[11px] text-gray-500 line-clamp-2">
-                        {model.modification}
-                      </p>
+                    {/* Блок информации о модификациях */}
+                    {(model.hasModifications || model.modification) && (
+                      <div className="mt-1.5 rounded-lg bg-slate-50 border border-slate-100 px-2.5 py-1.5">
+                        <p className="text-[10px] font-medium text-slate-500 uppercase tracking-wide mb-0.5">
+                          Модификации
+                        </p>
+                        {model.hasModifications && !model.modification && (
+                          <p className="text-[11px] text-slate-600">
+                            У модели есть модификации — выбор при переходе
+                          </p>
+                        )}
+                        {model.modification && (
+                          <p className="text-[11px] text-slate-700 line-clamp-2">
+                            {model.modification}
+                          </p>
+                        )}
+                      </div>
                     )}
                   </div>
                 </div>

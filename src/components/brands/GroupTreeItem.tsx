@@ -14,6 +14,8 @@ interface GroupTreeItemProps {
   onSelectGroup?: (group: Group) => void;
   /** Id-ներ այն խմբերի, որոնք ընթացիկ path-ում են (աջ պանելի breadcrumb) — ցուցադրվում է active. */
   selectedPathIds?: Set<string>;
+  /** Այն group-ի id-ը, որի «деталей»-ն բաց էր (հետ վերադառնալիս — ընթացիկ դետալ). */
+  currentDetailGroupId?: string | null;
 }
 
 export default function GroupTreeItem({
@@ -28,9 +30,11 @@ export default function GroupTreeItem({
   onLoadSubGroups,
   onSelectGroup,
   selectedPathIds,
+  currentDetailGroupId,
 }: GroupTreeItemProps) {
   const idStr = String(group.id);
   const isActive = Boolean(selectedPathIds?.has(idStr));
+  const isCurrentDetail = isActive && currentDetailGroupId != null && idStr === String(currentDetailGroupId);
   const hasSub = group.hasSubGroups || group.needLoadSubGroups;
   const loaded = loadedSubGroups[idStr];
   const effectiveSubGroups =
@@ -65,7 +69,13 @@ export default function GroupTreeItem({
         style={{ paddingLeft: level > 0 ? `${level * 16}px` : 0 }}
       >
         <div
-          className={`flex items-center gap-2 py-1.5 rounded-lg group/item ${isActive ? 'bg-[#E21321]/10 border-l-2 border-[#E21321] pl-2 -ml-0.5' : 'hover:bg-slate-50/80'}`}
+          className={`flex items-center gap-2 py-1.5 rounded-lg group/item ${
+            isCurrentDetail
+              ? 'bg-[#E21321]/15 border-l-2 border-[#E21321] pl-2 -ml-0.5 ring-1 ring-[#E21321]/40'
+              : isActive
+                ? 'bg-[#E21321]/10 border-l-2 border-[#E21321] pl-2 -ml-0.5'
+                : 'hover:bg-slate-50/80'
+          }`}
         >
           {hasSub ? (
             <button
@@ -123,7 +133,7 @@ export default function GroupTreeItem({
               </span>
             )}
             {group.hasParts && (
-              <span className="inline-flex items-center gap-1 rounded-full bg-emerald-50 text-[10px] font-medium text-emerald-600 px-1.5 py-[2px]">
+              <span className={`inline-flex items-center gap-1 rounded-full text-[10px] font-medium px-1.5 py-[2px] ${isCurrentDetail ? 'bg-[#E21321]/20 text-[#E21321]' : 'bg-emerald-50 text-emerald-600'}`}>
                 детали
               </span>
             )}
@@ -150,6 +160,7 @@ export default function GroupTreeItem({
                 onLoadSubGroups={onLoadSubGroups}
                 onSelectGroup={onSelectGroup}
                 selectedPathIds={selectedPathIds}
+                currentDetailGroupId={currentDetailGroupId}
               />
             ))}
           </ul>

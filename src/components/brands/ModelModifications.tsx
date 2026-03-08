@@ -315,7 +315,7 @@ export default function ModelModifications({
           или фильтры.
         </p>
       ) : (
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4 md:gap-5">
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
           {filteredSortedMods.map((mod) => {
             const typeId = data.type?.id ?? type;
             const markId = data.mark?.id ?? mark;
@@ -333,49 +333,34 @@ export default function ModelModifications({
               <Link
                 href={groupsUrl}
                 key={mod.id}
-                className="group relative overflow-hidden rounded-2xl border border-gray-100 bg-white shadow-[0_10px_30px_rgba(15,23,42,0.08)] hover:shadow-[0_20px_45px_rgba(15,23,42,0.22)] hover:-translate-y-1 transition-all duration-200 flex"
+                className="group relative overflow-hidden rounded-xl border border-gray-100 bg-white shadow-[0_6px_20px_rgba(15,23,42,0.06)] hover:shadow-[0_12px_28px_rgba(15,23,42,0.12)] hover:-translate-y-0.5 transition-all duration-200 flex"
               >
-                <span className="pointer-events-none absolute inset-px rounded-2xl bg-linear-to-br from-white via-white to-slate-50 opacity-80 group-hover:opacity-100 transition-opacity duration-200" />
+                <span className="pointer-events-none absolute inset-px rounded-xl bg-linear-to-br from-white via-white to-slate-50 opacity-80 group-hover:opacity-100 transition-opacity duration-200" />
 
                 {modelImgSrc && (
-                  <div className="relative z-10 w-40 shrink-0 bg-slate-50 flex items-center justify-center p-2 border-r border-gray-100">
+                  <div className="relative z-10 w-40 shrink-0 bg-slate-50 flex items-center justify-center p-1.5 border-r border-gray-100">
                     {/* eslint-disable-next-line @next/next/no-img-element */}
                     <img
                       src={modelImgSrc}
                       alt=""
-                      className="max-h-24 w-full object-contain"
+                      className="h-auto w-full object-contain rounded-xl"
                     />
                   </div>
                 )}
 
-                <div className="relative z-10 flex flex-col gap-2 flex-1 min-w-0 p-4">
-                  <h3 className="text-sm md:text-[15px] font-semibold text-gray-900">
+                <div className="relative z-10 flex flex-col gap-1 flex-1 min-w-0 p-3">
+                  <h3 className="text-xs font-semibold text-gray-900 leading-tight line-clamp-2">
                     {mod.name}
                   </h3>
 
                   {mod.description && (
-                    <p className="text-[11px] text-gray-500 line-clamp-1">
+                    <p className="text-[10px] text-gray-500 line-clamp-1">
                       {mod.description}
                     </p>
                   )}
-
-                  {sortedParams.length > 0 && (
-                    <dl className="mt-1 grid grid-cols-[auto_1fr] gap-x-2 gap-y-0.5 text-[11px]">
-                      {sortedParams.map((param) => (
-                        <span key={param.idx ?? param.key} className="contents">
-                          <dt className="text-gray-500 truncate">
-                            {param.name ?? param.key}:
-                          </dt>
-                          <dd className="text-gray-900 font-medium truncate">
-                            {param.value}
-                          </dd>
-                        </span>
-                      ))}
-                    </dl>
-                  )}
                 </div>
 
-                <span className="pointer-events-none absolute inset-x-4 bottom-2 h-[2px] rounded-full bg-linear-to-r from-[#E21321]/70 via-[#ff8a3d]/70 to-[#E21321]/70 opacity-0 group-hover:opacity-100 transition-opacity duration-200" />
+                <span className="pointer-events-none absolute inset-x-3 bottom-1.5 h-px rounded-full bg-linear-to-r from-[#E21321]/60 via-[#ff8a3d]/60 to-[#E21321]/60 opacity-0 group-hover:opacity-100 transition-opacity duration-200" />
               </Link>
             );
           })}

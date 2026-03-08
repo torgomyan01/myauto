@@ -121,7 +121,10 @@
     border-radius: 9999px;
     background: rgba(100, 116, 139, 0.6);
     opacity: 1;
-    transition: width 0.3s ease, background 0.3s ease, box-shadow 0.3s ease;
+    transition:
+      width 0.3s ease,
+      background 0.3s ease,
+      box-shadow 0.3s ease;
     cursor: pointer;
     &:hover {
       background: rgba(148, 163, 184, 0.8);
@@ -156,4 +159,8 @@
 }
 [data-group-parts-table] tr[data-scheme-row-highlighted='true'] td {
   background-color: rgba(226, 19, 33, 0.15) !important;
+}
+
+main {
+  min-height: calc(100vh - 400px);
 }

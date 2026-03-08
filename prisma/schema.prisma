@@ -7,22 +7,44 @@ datasource db {
   url      = env("DATABASE_URL")
 }
 
-model cars {
-  id        Int    @id @default(autoincrement())
-  name      String @db.VarChar(255)
-  parent_id Int?
+model user {
+  id                   Int                     @id @default(autoincrement())
+  email                String                  @unique(map: "User_email_key")
+  name                 String
+  password             String
+  phone                String?
+  role                 user_role               @default(USER)
+  blocked              Boolean                 @default(false)
+  legalEntityVerified  Boolean                 @default(false)
+  createdAt            DateTime                @default(now())
+  updatedAt            DateTime
+  garageCars           GarageCar[]
+  legalEntityVerifications LegalEntityVerification[]
 }
 
-model user {
-  id         Int         @id @default(autoincrement())
-  email      String      @unique(map: "User_email_key")
-  name       String
-  password   String
-  phone      String?
-  role       user_role   @default(USER)
-  createdAt  DateTime    @default(now())
-  updatedAt  DateTime
-  garageCars GarageCar[]
+model LegalEntityVerification {
+  id              Int                        @id @default(autoincrement())
+  user            user                       @relation(fields: [userId], references: [id], onDelete: Cascade)
+  userId          Int
+  companyName     String                     @db.VarChar(255)
+  taxId           String                     @db.VarChar(64)
+  legalAddress    String                     @db.VarChar(512)
+  paymentProofPath String?                   @db.VarChar(512)
+  paymentProofData String?                   @db.LongText
+  amount          Int                       @default(1000)
+  status          verification_status       @default(PENDING)
+  rejectionReason String?                   @db.VarChar(512)
+  submittedAt     DateTime                  @default(now())
+  reviewedAt      DateTime?
+  reviewedByUserId Int?
+  @@index([userId])
+  @@index([status])
+}
+
+enum verification_status {
+  PENDING
+  APPROVED
+  REJECTED
 }
 
 enum user_role {

@@ -2,14 +2,13 @@ import MainTemplate from '@/components/layout/main-template/MainTemplate';
 import ProfileForm, {
   type ProfileData,
 } from '@/components/account/profile/ProfileForm';
-import { getServerSession } from 'next-auth';
-import { authOptions } from '@/app/api/auth/[...nextauth]/route';
+import { getAuthSession } from '@/lib/auth-server';
 import { prisma } from '@/lib/prisma';
 import { redirect } from 'next/navigation';
 import { ROUTES } from '@/constants/routes';
 
 export default async function ProfilePage() {
-  const session = await getServerSession(authOptions);
+  const session = await getAuthSession();
 
   if (!session?.user) {
     redirect(ROUTES.LOGIN);

@@ -1,8 +1,7 @@
 'use server';
 
-import { getServerSession } from 'next-auth';
+import { getAuthSession } from '@/lib/auth-server';
 import axios from 'axios';
-import { authOptions } from '@/app/api/auth/[...nextauth]/route';
 import { prisma } from '@/lib/prisma';
 
 export interface GarageCarItem {
@@ -19,7 +18,7 @@ export interface GarageCarItem {
 }
 
 export async function getGarageList(): Promise<{ cars: GarageCarItem[] }> {
-  const session = await getServerSession(authOptions);
+  const session = await getAuthSession();
 
   if (!session?.user || !(session.user as { id?: string }).id) {
     throw new Error('Необходима авторизация');
@@ -49,7 +48,7 @@ export async function getGarageList(): Promise<{ cars: GarageCarItem[] }> {
 }
 
 export async function addGarageCar(vin: string): Promise<{ message: string; car: GarageCarItem }> {
-  const session = await getServerSession(authOptions);
+  const session = await getAuthSession();
 
   if (!session?.user || !(session.user as { id?: string }).id) {
     throw new Error('Необходима авторизация');
@@ -127,7 +126,7 @@ export async function addGarageCar(vin: string): Promise<{ message: string; car:
 }
 
 export async function deleteGarageCar(id: number): Promise<{ message: string }> {
-  const session = await getServerSession(authOptions);
+  const session = await getAuthSession();
 
   if (!session?.user || !(session.user as { id?: string }).id) {
     throw new Error('Необходима авторизация');

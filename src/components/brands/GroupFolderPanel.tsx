@@ -13,7 +13,9 @@ interface GroupFolderPanelProps {
   buildPartsUrl: (g: Group, parentId: string | number | null) => string;
   onBreadcrumbClick: (index: number) => void;
   onOpenFolder: (folder: Group, parent: Group) => Promise<void>;
+  onBeforeNavigateToParts?: (group: Group) => void;
   loadingSubGroups: Set<string>;
+  activeGroupId?: string | null;
 }
 
 function FolderCard({
@@ -22,14 +24,18 @@ function FolderCard({
   parentGroup,
   buildPartsUrl,
   onOpenFolder,
+  onBeforeNavigateToParts,
   isLoading,
+  isActive,
 }: {
   group: Group;
   parentId: string | number | null;
   parentGroup: Group;
   buildPartsUrl: (g: Group, parentId: string | number | null) => string;
   onOpenFolder: (folder: Group, parent: Group) => Promise<void>;
+  onBeforeNavigateToParts?: (group: Group) => void;
   isLoading: boolean;
+  isActive?: boolean;
 }) {
   const hasSub = group.hasSubGroups || group.needLoadSubGroups;
   const partsUrl = buildPartsUrl(group, parentId);
@@ -39,8 +45,19 @@ function FolderCard({
     onOpenFolder(group, parentGroup);
   };
 
+  const handleOpenPartsClick = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    onBeforeNavigateToParts?.(group);
+  };
+
   return (
-    <div className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm hover:border-slate-300 hover:shadow-md transition-all flex flex-col items-center text-center min-w-[140px]">
+    <div
+      className={`rounded-xl border p-4 shadow-sm transition-all flex flex-col items-center text-center min-w-[140px] ${
+        isActive
+          ? 'border-[#E21321] bg-red-50/50 shadow-[0_0_0_2px_rgba(226,19,33,0.15)]'
+          : 'border-slate-200 bg-white hover:border-slate-300 hover:shadow-md'
+      }`}
+    >
       <button
         type="button"
         onClick={handleClick}
@@ -85,7 +102,7 @@ function FolderCard({
         <Link
           href={partsUrl}
           className="mt-2 text-xs text-[#E21321] hover:underline"
-          onClick={(e) => e.stopPropagation()}
+          onClick={handleOpenPartsClick}
         >
           Открыть детали
         </Link>
@@ -99,7 +116,9 @@ export default function GroupFolderPanel({
   buildPartsUrl,
   onBreadcrumbClick,
   onOpenFolder,
+  onBeforeNavigateToParts,
   loadingSubGroups,
+  activeGroupId,
 }: GroupFolderPanelProps) {
   if (path.length === 0) {
     return (
@@ -115,24 +134,45 @@ export default function GroupFolderPanel({
   const current = path[path.length - 1];
   const parentId = path.length > 1 ? path[path.length - 2].group.id : null;
 
+  const sortedChildren = [...current.children].sort((a, b) => {
+    const aIsFolder = a.hasSubGroups || a.needLoadSubGroups;
+    const bIsFolder = b.hasSubGroups || b.needLoadSubGroups;
+    if (aIsFolder && !bIsFolder) return -1;
+    if (!aIsFolder && bIsFolder) return 1;
+    return (a.name ?? '').localeCompare(b.name ?? '', undefined, { sensitivity: 'base' });
+  });
+
   return (
     <div className="flex flex-col gap-4">
       <nav className="flex flex-wrap items-center gap-1 text-sm">
-        {path.map((item, index) => (
-          <span key={String(item.group.id)} className="flex items-center gap-1">
-            {index > 0 && <span className="text-slate-300">/</span>}
-            <button
-              type="button"
-              onClick={() => onBreadcrumbClick(index)}
-              className="text-slate-600 hover:text-[#E21321] hover:underline font-medium"
-            >
-              {item.group.name}
-            </button>
-          </span>
-        ))}
+        {path.map((item, index) => {
+          const isLast = index === path.length - 1;
+          const isCurrentDetail = isLast && activeGroupId != null && String(item.group.id) === activeGroupId;
+          return (
+            <span key={String(item.group.id)} className="flex items-center gap-1">
+              {index > 0 && <span className="text-slate-300">/</span>}
+              <button
+                type="button"
+                onClick={() => onBreadcrumbClick(index)}
+                className={
+                  isCurrentDetail
+                    ? 'text-[#E21321] font-semibold hover:underline'
+                    : 'text-slate-600 hover:text-[#E21321] hover:underline font-medium'
+                }
+              >
+                {item.group.name}
+              </button>
+              {isCurrentDetail && (
+                <span className="inline-flex rounded-full bg-[#E21321]/15 text-[10px] font-medium text-[#E21321] px-1.5 py-[2px]">
+                  детали
+                </span>
+              )}
+            </span>
+          );
+        })}
       </nav>
       <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-3">
-        {current.children.map((child) => (
+        {sortedChildren.map((child) => (
           <FolderCard
             key={String(child.id)}
             group={child}
@@ -140,7 +180,9 @@ export default function GroupFolderPanel({
             parentGroup={current.group}
             buildPartsUrl={buildPartsUrl}
             onOpenFolder={onOpenFolder}
+            onBeforeNavigateToParts={onBeforeNavigateToParts}
             isLoading={loadingSubGroups.has(String(child.id))}
+            isActive={activeGroupId != null && String(child.id) === activeGroupId}
           />
         ))}
       </div>

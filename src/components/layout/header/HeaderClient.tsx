@@ -267,6 +267,7 @@ export default function HeaderClient({ session }: HeaderClientProps) {
                 <UserDropdown
                   isOpen={openDropdown === 'user'}
                   onToggle={() => toggleDropdown('user')}
+                  session={session}
                 />
                 <div className={styles.cars}>
                   <div
@@ -285,6 +286,55 @@ export default function HeaderClient({ session }: HeaderClientProps) {
                     className={`${styles.carsInfoHide} ${openDropdown === 'cars' ? styles.show : ''} z-50`}
                   >
                     <GarageDropdown />
+                  </div>
+                </div>
+                <div className="relative">
+                  <button
+                    type="button"
+                    onClick={() => toggleDropdown('add')}
+                    className="flex h-[50px] w-[50px] shrink-0 items-center justify-center rounded-[10px] bg-[#f9f9f9] transition-colors hover:bg-[#ececec] max-[1024px]:h-8 max-[1024px]:w-8"
+                    aria-expanded={openDropdown === 'add'}
+                    aria-haspopup="true"
+                  >
+                    <i
+                      className="fa-regular fa-plus text-[20px] max-[1024px]:text-base"
+                      aria-hidden
+                    />
+                  </button>
+                  {openDropdown === 'add' && (
+                    <div
+                      className="fixed inset-0 z-40"
+                      onClick={() => toggleDropdown('add')}
+                      aria-hidden
+                    />
+                  )}
+                  <div
+                    className={`absolute left-1/2 top-[calc(100%+8px)] z-50 min-w-[250px] -translate-x-1/2 rounded-xl border border-zinc-200/80 bg-white py-2 shadow-lg transition-all duration-200 ${
+                      openDropdown === 'add'
+                        ? 'pointer-events-auto translate-y-0 scale-100 opacity-100'
+                        : 'pointer-events-none scale-95 opacity-0'
+                    }`}
+                  >
+                    <Link
+                      href={ROUTES.ADD_CAR}
+                      onClick={() => toggleDropdown('add')}
+                      className="flex items-center gap-3 px-4 py-2.5 text-left text-[15px] text-zinc-800 transition-colors hover:bg-zinc-100"
+                    >
+                      <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-zinc-100 text-zinc-600">
+                        <i className="fa-solid fa-car text-sm" aria-hidden />
+                      </span>
+                      Добавить объявление
+                    </Link>
+                    <Link
+                      href={ROUTES.ADD_PART}
+                      onClick={() => toggleDropdown('add')}
+                      className="flex items-center gap-3 px-4 py-2.5 text-left text-[15px] text-zinc-800 transition-colors hover:bg-zinc-100"
+                    >
+                      <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-zinc-100 text-zinc-600">
+                        <i className="fa-sharp fa-regular fa-gear"></i>
+                      </span>
+                      Добавить запчасть
+                    </Link>
                   </div>
                 </div>
               </div>

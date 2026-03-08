@@ -3,6 +3,10 @@ interface ModelGroupsToolbarProps {
   onSearchChange: (value: string) => void;
   onExpandAll: () => void;
   onCollapseAll: () => void;
+  canGoBack?: boolean;
+  canGoForward?: boolean;
+  onHistoryBack?: () => void;
+  onHistoryForward?: () => void;
 }
 
 export default function ModelGroupsToolbar({
@@ -10,9 +14,35 @@ export default function ModelGroupsToolbar({
   onSearchChange,
   onExpandAll,
   onCollapseAll,
+  canGoBack,
+  canGoForward,
+  onHistoryBack,
+  onHistoryForward,
 }: ModelGroupsToolbarProps) {
   return (
     <div className="flex flex-col sm:flex-row sm:items-center gap-3">
+      <div className="flex items-center gap-2 shrink-0">
+        <button
+          type="button"
+          onClick={onHistoryBack}
+          disabled={!canGoBack}
+          className="h-9 w-9 rounded-lg border border-gray-200 bg-white text-gray-700 hover:bg-gray-50 hover:border-gray-300 transition-colors disabled:opacity-40 disabled:pointer-events-none flex items-center justify-center"
+          aria-label="Назад по папкам"
+          title="Назад"
+        >
+          <i className="fa-solid fa-arrow-left text-sm" aria-hidden />
+        </button>
+        <button
+          type="button"
+          onClick={onHistoryForward}
+          disabled={!canGoForward}
+          className="h-9 w-9 rounded-lg border border-gray-200 bg-white text-gray-700 hover:bg-gray-50 hover:border-gray-300 transition-colors disabled:opacity-40 disabled:pointer-events-none flex items-center justify-center"
+          aria-label="Вперёд по папкам"
+          title="Вперёд"
+        >
+          <i className="fa-solid fa-arrow-right text-sm" aria-hidden />
+        </button>
+      </div>
       <div className="relative flex-1 max-w-md">
         <span className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-slate-400">
           <i className="fa-solid fa-magnifying-glass text-sm" aria-hidden />

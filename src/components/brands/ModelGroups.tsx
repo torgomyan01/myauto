@@ -15,41 +15,7 @@ import ModelGroupsToolbar from './ModelGroupsToolbar';
 import GroupTreeItem from './GroupTreeItem';
 import GroupFolderPanel from './GroupFolderPanel';
 
-const STORAGE_KEY_PREFIX = 'model-groups-state';
-
-function getStorageKey(
-  type: string,
-  mark: string,
-  modelId: string,
-  modificationId: string
-): string {
-  return `${STORAGE_KEY_PREFIX}-${type}-${mark}-${modelId}-${modificationId}`;
-}
-
-interface SavedModelGroupsState {
-  expandedIds: string[];
-  selectedPathIds: string[];
-}
-
-function loadState(key: string): SavedModelGroupsState | null {
-  try {
-    if (typeof window === 'undefined') return null;
-    const raw = localStorage.getItem(key);
-    if (!raw) return null;
-    return JSON.parse(raw) as SavedModelGroupsState;
-  } catch {
-    return null;
-  }
-}
-
-function saveState(key: string, state: SavedModelGroupsState) {
-  try {
-    if (typeof window === 'undefined') return;
-    localStorage.setItem(key, JSON.stringify(state));
-  } catch {
-    // ignore
-  }
-}
+type PathItem = { group: Group; children: Group[] };
 
 interface ModelGroupsProps {
   type: string;
@@ -105,13 +71,15 @@ export default function ModelGroups({
   const [expandedIds, setExpandedIds] = useState<Set<string>>(() => new Set());
   const [loadedSubGroups, setLoadedSubGroups] = useState<Record<string, Group[]>>({});
   const [loadingSubGroups, setLoadingSubGroups] = useState<Set<string>>(new Set());
-  const [selectedPath, setSelectedPath] = useState<{ group: Group; children: Group[] }[]>([]);
-  const initialExpandDone = useRef(false);
-  const savedPathIdsToRestore = useRef<string[] | null>(null);
+  const [selectedPath, setSelectedPath] = useState<PathItem[]>([]);
+  const [pathHistory, setPathHistory] = useState<{ path: PathItem[]; expandedIds: string[] }[]>([]);
+  const [pathHistoryIndex, setPathHistoryIndex] = useState(-1);
   const loadSubGroupsRef = useRef<(groupId: string) => Promise<Group[]>>(
     () => Promise.resolve([])
   );
-  const storageKey = getStorageKey(type, mark, modelId, modificationId);
+
+  const activeDetailGroupId =
+    selectedPath.length > 0 ? String(selectedPath[selectedPath.length - 1].group.id) : null;
 
   function getEffectiveChildren(g: Group): Group[] {
     if (Array.isArray(g.subGroups) && g.subGroups.length > 0) return g.subGroups;
@@ -161,59 +129,45 @@ export default function ModelGroups({
   );
 
   useEffect(() => {
-    if (meaningfulTopGroups.length === 0) return;
-    const saved = loadState(storageKey);
-    if (saved) {
-      if (saved.expandedIds?.length) {
-        setExpandedIds(new Set(saved.expandedIds));
-      }
-      if (saved.selectedPathIds?.length) {
-        savedPathIdsToRestore.current = saved.selectedPathIds;
-      }
+    if (pathHistoryIndex >= 0 && pathHistoryIndex < pathHistory.length) {
+      const entry = pathHistory[pathHistoryIndex];
+      setSelectedPath(entry.path);
+      setExpandedIds(new Set(entry.expandedIds));
     }
-    if (!initialExpandDone.current) {
-      if (!saved?.expandedIds?.length) {
-        setExpandedIds(new Set(meaningfulTopGroups.map((g) => String(g.id))));
-      }
-      initialExpandDone.current = true;
-    }
-  }, [meaningfulTopGroups, storageKey]);
+  }, [pathHistoryIndex, pathHistory]);
 
   useEffect(() => {
-    if (meaningfulTopGroups.length === 0 || !savedPathIdsToRestore.current?.length)
-      return;
-    const pathIds = savedPathIdsToRestore.current;
-    savedPathIdsToRestore.current = null;
-    let cancelled = false;
-    (async () => {
-      const path: { group: Group; children: Group[] }[] = [];
-      let currentLevel = meaningfulTopGroups;
-      const loadSubGroups = loadSubGroupsRef.current;
-      for (const id of pathIds) {
-        if (cancelled) break;
-        const g = currentLevel.find((x) => String(x.id) === id);
-        if (!g) break;
-        let children = getEffectiveChildren(g);
-        if (g.needLoadSubGroups && children.length === 0 && loadSubGroups) {
-          children = await loadSubGroups(String(g.id));
-        }
-        path.push({ group: g, children });
-        currentLevel = children;
-      }
-      if (!cancelled && path.length > 0) setSelectedPath(path);
-    })();
-    return () => {
-      cancelled = true;
-    };
-  }, [meaningfulTopGroups]);
+    if (meaningfulTopGroups.length > 0 && pathHistory.length === 0) {
+      setExpandedIds(new Set(meaningfulTopGroups.map((g) => String(g.id))));
+    }
+  }, [meaningfulTopGroups, pathHistory.length]);
 
-  useEffect(() => {
-    if (!storageKey) return;
-    saveState(storageKey, {
-      expandedIds: Array.from(expandedIds),
-      selectedPathIds: selectedPath.map((p) => String(p.group.id)),
+  function pushPathToHistory(newPath: PathItem[], newExpandedIds: Set<string> | string[]) {
+    const expandedArr = Array.from(newExpandedIds);
+    const nextIndex =
+      pathHistoryIndex < pathHistory.length - 1 ? pathHistoryIndex + 1 : pathHistory.length;
+    setPathHistory((prev) => {
+      const truncated =
+        pathHistoryIndex < prev.length - 1 ? prev.slice(0, pathHistoryIndex + 1) : prev;
+      return [...truncated, { path: newPath, expandedIds: expandedArr }];
     });
-  }, [storageKey, expandedIds, selectedPath]);
+    setPathHistoryIndex(nextIndex);
+    setSelectedPath(newPath);
+    setExpandedIds(new Set(expandedArr));
+  }
+
+  const canGoBack = pathHistoryIndex > 0;
+  const canGoForward = pathHistory.length > 0 && pathHistoryIndex < pathHistory.length - 1;
+
+  function handleHistoryBack() {
+    if (!canGoBack) return;
+    setPathHistoryIndex(pathHistoryIndex - 1);
+  }
+
+  function handleHistoryForward() {
+    if (!canGoForward) return;
+    setPathHistoryIndex(pathHistoryIndex + 1);
+  }
 
   if (!type || !mark || !modelId || !modificationId) {
     return (
@@ -290,16 +244,22 @@ export default function ModelGroups({
 
   async function handleSelectGroupFromTree(group: Group) {
     const children = getEffectiveChildren(group);
+    let path: PathItem[];
+    let newExpanded: Set<string>;
     if (group.needLoadSubGroups && children.length === 0) {
       const list = await loadSubGroups(String(group.id));
-      setSelectedPath([{ group: { ...group, subGroups: list }, children: list }]);
-      return;
+      path = [{ group: { ...group, subGroups: list }, children: list }];
+    } else {
+      path = [{ group, children }];
     }
-    setSelectedPath([{ group, children }]);
+    newExpanded = new Set(expandedIds);
+    path.forEach((item) => newExpanded.add(String(item.group.id)));
+    pushPathToHistory(path, newExpanded);
   }
 
   function handleBreadcrumbClick(index: number) {
-    setSelectedPath((prev) => prev.slice(0, index + 1));
+    const newPath = selectedPath.slice(0, index + 1);
+    pushPathToHistory(newPath, expandedIds);
   }
 
   async function handleOpenFolderInPanel(
@@ -310,7 +270,18 @@ export default function ModelGroups({
     if (folder.needLoadSubGroups && children.length === 0) {
       children = await loadSubGroups(String(folder.id));
     }
-    setSelectedPath((prev) => [...prev, { group: folder, children }]);
+    const newPath = [...selectedPath, { group: folder, children }];
+    const newExpanded = new Set(expandedIds);
+    newPath.forEach((item) => newExpanded.add(String(item.group.id)));
+    pushPathToHistory(newPath, newExpanded);
+  }
+
+  function handleBeforeNavigateToParts(group: Group) {
+    const children = getEffectiveChildren(group);
+    const newPath = [...selectedPath, { group, children }];
+    const newExpanded = new Set(expandedIds);
+    newPath.forEach((item) => newExpanded.add(String(item.group.id)));
+    pushPathToHistory(newPath, newExpanded);
   }
 
   return (
@@ -328,6 +299,10 @@ export default function ModelGroups({
           onSearchChange={setSearchQuery}
           onExpandAll={expandAll}
           onCollapseAll={collapseAll}
+          canGoBack={canGoBack}
+          canGoForward={canGoForward}
+          onHistoryBack={handleHistoryBack}
+          onHistoryForward={handleHistoryForward}
         />
       </div>
 
@@ -364,6 +339,7 @@ export default function ModelGroups({
                 onLoadSubGroups={loadSubGroups}
                 onSelectGroup={handleSelectGroupFromTree}
                 selectedPathIds={selectedPathIds}
+                currentDetailGroupId={activeDetailGroupId}
               />
             ))}
           </ul>
@@ -373,7 +349,9 @@ export default function ModelGroups({
               buildPartsUrl={buildPartsUrl}
               onBreadcrumbClick={handleBreadcrumbClick}
               onOpenFolder={handleOpenFolderInPanel}
+              onBeforeNavigateToParts={handleBeforeNavigateToParts}
               loadingSubGroups={loadingSubGroups}
+              activeGroupId={activeDetailGroupId}
             />
           </div>
         </div>
