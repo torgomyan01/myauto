@@ -38,26 +38,19 @@ export default function Spares() {
           </div>
         </div>
 
-        <div className="grid grid-cols-1 gap-3 sm:grid-cols-3 md:grid-cols-5 md:gap-4">
-          {categories.map((item) => (
+        <div className="grid grid-cols-1 gap-5 sm:grid-cols-2 md:grid-cols-3 xl:grid-cols-5">
+          {categories.map((item, index) => (
             <Link
               href={item.href}
               key={item.label}
-              className="group relative flex flex-col items-center rounded-2xl border border-slate-100 bg-white px-4 py-6 text-center shadow-[0_4px_20px_rgba(15,23,42,0.06)] transition-all duration-200 hover:-translate-y-1 hover:border-[#E21321]/40 hover:shadow-[0_12px_32px_rgba(15,23,42,0.12)] md:py-8"
+              className="flex h-[240px] flex-col items-center rounded-2xl bg-white p-5 text-center shadow-[0_0_2px_rgba(0,0,0,0.08),0_2px_24px_rgba(0,0,0,0.06)] transition-shadow duration-200 hover:shadow-[0_0_2px_rgba(0,0,0,0.08),0_2px_24px_rgba(0,0,0,0.16)] md:h-auto"
             >
-              {/* gradient strip */}
-              <span
-                className="absolute left-3 top-1/2 h-12 w-1 -translate-y-1/2 rounded-full opacity-60 transition-opacity group-hover:opacity-100"
-                style={{
-                  background: 'linear-gradient(to bottom, #E21321, #ff8a3d)',
-                }}
+              <img
+                src={`/img/spares-img${index + 1}.png`}
+                alt={item.label}
+                className="mb-1 max-h-full max-w-full"
               />
-
-              <div className="relative flex h-14 w-14 shrink-0 items-center justify-center rounded-2xl bg-slate-50 text-[#E21321] ring-1 ring-slate-100/80 transition-all duration-200 group-hover:bg-[#E21321]/5 group-hover:scale-105 md:h-16 md:w-16">
-                <i className={`fa-solid ${item.icon} text-2xl md:text-3xl transition-transform duration-200 group-hover:scale-110`} aria-hidden />
-              </div>
-
-              <span className="mt-3 text-sm font-semibold text-slate-800 transition-colors group-hover:text-[#E21321] md:text-base">
+              <span className="mt-auto text-[20px] text-black">
                 {item.label}
               </span>
             </Link>

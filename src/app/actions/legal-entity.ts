@@ -37,18 +37,41 @@ export async function submitLegalEntityVerification(data: {
     return { ok: false, error: 'Вы уже верифицированы' };
   }
 
-  await prisma.legalEntityVerification.create({
-    data: {
-      userId,
-      companyName,
-      taxId,
-      legalAddress,
-      paymentProofPath: data.paymentProofPath || null,
-      paymentProofData: data.paymentProofBase64 || null,
-      amount: 1000,
-      status: 'PENDING',
-    },
+  const existing = await prisma.legalEntityVerification.findFirst({
+    where: { userId },
   });
+
+  if (existing) {
+    // Обновляем единственную заявку пользователя и отправляем снова на модерацию
+    await prisma.legalEntityVerification.update({
+      where: { id: existing.id },
+      data: {
+        companyName,
+        taxId,
+        legalAddress,
+        paymentProofPath: data.paymentProofPath || null,
+        paymentProofData: data.paymentProofBase64 || null,
+        status: 'PENDING',
+        rejectionReason: null,
+        submittedAt: new Date(),
+        reviewedAt: null,
+        reviewedByUserId: null,
+      },
+    });
+  } else {
+    await prisma.legalEntityVerification.create({
+      data: {
+        userId,
+        companyName,
+        taxId,
+        legalAddress,
+        paymentProofPath: data.paymentProofPath || null,
+        paymentProofData: data.paymentProofBase64 || null,
+        amount: 1000,
+        status: 'PENDING',
+      },
+    });
+  }
 
   revalidatePath(ROUTES.ADD_PART_VERIFY);
   revalidatePath(ROUTES.ADD_PART);
@@ -81,5 +104,40 @@ export async function getCurrentUserVerificationStatus(): Promise<{
   return {
     legalEntityVerified: false,
     pendingVerification: !!pending,
+  };
+}
+
+export type MyLegalEntityVerification =
+  | {
+      companyName: string;
+      taxId: string;
+      legalAddress: string;
+      paymentProofPath: string | null;
+      status: 'PENDING' | 'APPROVED' | 'REJECTED';
+      rejectionReason: string | null;
+    }
+  | null;
+
+export async function getMyLegalEntityVerification(): Promise<MyLegalEntityVerification> {
+  const session = await getAuthSession();
+  if (!session?.user?.id) {
+    return null;
+  }
+
+  const userId = Number(session.user.id);
+  const verification = await prisma.legalEntityVerification.findFirst({
+    where: { userId },
+    orderBy: { submittedAt: 'desc' },
+  });
+
+  if (!verification) return null;
+
+  return {
+    companyName: verification.companyName,
+    taxId: verification.taxId,
+    legalAddress: verification.legalAddress,
+    paymentProofPath: verification.paymentProofPath,
+    status: verification.status as 'PENDING' | 'APPROVED' | 'REJECTED',
+    rejectionReason: verification.rejectionReason,
   };
 }

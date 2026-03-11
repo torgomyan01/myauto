@@ -10,6 +10,7 @@ import { ROUTES } from '@/constants/routes';
 import LanguageSelect from './LanguageSelect';
 import GarageDropdown from './GarageDropdown';
 import UserDropdown from './UserDropdown';
+import { NotificationsDropdown } from './NotificationsDropdown';
 import { searchCatalog } from '@/app/actions/search';
 
 interface HeaderClientProps {
@@ -50,6 +51,7 @@ interface SearchResultPayload {
   cars: SearchCarResult[];
 }
 
+
 export default function HeaderClient({ session }: HeaderClientProps) {
   const router = useRouter();
   const [searchValue, setSearchValue] = useState('');
@@ -60,6 +62,7 @@ export default function HeaderClient({ session }: HeaderClientProps) {
     useState<SearchResultPayload | null>(null);
   const [openDropdown, setOpenDropdown] = useState<string | null>(null);
   const [isSearchFocused, setIsSearchFocused] = useState(false);
+  const [mobileAddOpen, setMobileAddOpen] = useState(false);
   const formRef = useRef<HTMLDivElement>(null);
   const iconsWrapRef = useRef<HTMLDivElement>(null);
 
@@ -254,7 +257,10 @@ export default function HeaderClient({ session }: HeaderClientProps) {
 
           {session ? (
             <>
-              <div className={styles.iconsWrap} ref={iconsWrapRef}>
+              <div
+                className={`${styles.iconsWrap} max-[1024px]:hidden`}
+                ref={iconsWrapRef}
+              >
                 <div className={styles.basket}>
                   <Link href={ROUTES.CART} className={styles.icon}>
                     <i
@@ -268,6 +274,10 @@ export default function HeaderClient({ session }: HeaderClientProps) {
                   isOpen={openDropdown === 'user'}
                   onToggle={() => toggleDropdown('user')}
                   session={session}
+                />
+                <NotificationsDropdown
+                  isOpen={openDropdown === 'notifications'}
+                  onToggle={() => toggleDropdown('notifications')}
                 />
                 <div className={styles.cars}>
                   <div
@@ -296,10 +306,12 @@ export default function HeaderClient({ session }: HeaderClientProps) {
                     aria-expanded={openDropdown === 'add'}
                     aria-haspopup="true"
                   >
-                    <i
-                      className="fa-regular fa-plus text-[20px] max-[1024px]:text-base"
-                      aria-hidden
-                    />
+                    <span className="flex items-center gap-1">
+                      <i
+                        className="fa-regular fa-plus text-[20px] max-[1024px]:text-base"
+                        aria-hidden
+                      />
+                    </span>
                   </button>
                   {openDropdown === 'add' && (
                     <div
@@ -339,6 +351,127 @@ export default function HeaderClient({ session }: HeaderClientProps) {
                 </div>
               </div>
               <LanguageSelect />
+
+              {/* Mobile bottom navigation */}
+              <div className="fixed inset-x-0 bottom-0 z-40 border-t border-zinc-200 bg-white/95 px-2 py-1.5 shadow-[0_-8px_30px_rgba(15,23,42,0.16)] backdrop-blur-md md:hidden">
+                <div className="mx-auto flex max-w-4xl items-center justify-between text-[11px] font-medium text-zinc-600">
+                  <Link
+                    href={ROUTES.CART}
+                    className="flex flex-1 flex-col items-center gap-0.5 px-1"
+                  >
+                    <span className="flex h-8 w-8 items-center justify-center rounded-full bg-zinc-100 text-zinc-700">
+                      <i className="fa-regular fa-cart-shopping text-[15px]" aria-hidden />
+                    </span>
+                    <span className="text-[10px]">Корзина</span>
+                  </Link>
+
+                  <Link
+                    href={ROUTES.GARAGE}
+                    className="flex flex-1 flex-col items-center gap-0.5 px-1"
+                  >
+                    <span className="flex h-8 w-8 items-center justify-center rounded-full bg-zinc-100 text-zinc-700">
+                      <i className="fa-regular fa-car text-[15px]" aria-hidden />
+                    </span>
+                    <span className="text-[10px]">Гараж</span>
+                  </Link>
+
+                  <button
+                    type="button"
+                    onClick={() => setMobileAddOpen(true)}
+                    className="flex flex-1 flex-col items-center gap-0.5 px-1"
+                  >
+                    <span className="flex h-9 w-9 items-center justify-center rounded-full bg-[#E21321] text-white shadow-[0_8px_20px_rgba(226,19,33,0.55)]">
+                      <i className="fa-regular fa-plus text-[15px]" aria-hidden />
+                    </span>
+                    <span className="text-[10px] text-zinc-700">Добавить</span>
+                  </button>
+
+                  <Link
+                    href={ROUTES.NOTIFICATIONS}
+                    className="flex flex-1 flex-col items-center gap-0.5 px-1"
+                  >
+                    <span className="flex h-8 w-8 items-center justify-center rounded-full bg-zinc-100 text-zinc-700">
+                      <i className="fa-regular fa-bell text-[15px]" aria-hidden />
+                    </span>
+                    <span className="text-[10px]">Уведомления</span>
+                  </Link>
+
+                  <Link
+                    href={ROUTES.PROFILE}
+                    className="flex flex-1 flex-col items-center gap-0.5 px-1"
+                  >
+                    <span className="flex h-8 w-8 items-center justify-center rounded-full bg-zinc-100 text-zinc-700">
+                      <i className="fa-regular fa-user text-[15px]" aria-hidden />
+                    </span>
+                    <span className="text-[10px]">Профиль</span>
+                  </Link>
+                </div>
+              </div>
+
+              {/* Mobile "add" selector modal */}
+              {mobileAddOpen && (
+                <div className="fixed inset-0 z-50 flex items-end justify-center md:hidden">
+                  <div
+                    className="absolute inset-0 bg-black/40 backdrop-blur-[1px]"
+                    onClick={() => setMobileAddOpen(false)}
+                    aria-hidden
+                  />
+                  <div className="relative z-10 w-full max-w-md rounded-t-3xl bg-white px-4 pb-6 pt-4 shadow-[0_-18px_60px_rgba(15,23,42,0.35)]">
+                    <div className="mx-auto mb-3 h-1 w-10 rounded-full bg-zinc-200" />
+                    <h2 className="mb-1 text-center text-sm font-semibold text-zinc-900">
+                      Что вы хотите добавить?
+                    </h2>
+                    <p className="mb-4 text-center text-[11px] text-zinc-500">
+                      Выберите тип объявления. Вы всегда сможете добавить больше позже.
+                    </p>
+                    <div className="space-y-2.5">
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setMobileAddOpen(false);
+                          router.push(ROUTES.ADD_CAR);
+                        }}
+                        className="flex w-full items-center gap-3 rounded-2xl border border-zinc-200 bg-zinc-50 px-3.5 py-2.5 text-left text-[13px] text-zinc-800 transition-colors hover:border-[#E21321]/60 hover:bg-zinc-50/80"
+                      >
+                        <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-zinc-100 text-zinc-600">
+                          <i className="fa-solid fa-car text-sm" aria-hidden />
+                        </span>
+                        <div className="flex flex-1 flex-col">
+                          <span className="font-medium">Добавить объявление</span>
+                          <span className="text-[11px] text-zinc-500">
+                            Продажа автомобиля целиком
+                          </span>
+                        </div>
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setMobileAddOpen(false);
+                          router.push(ROUTES.ADD_PART);
+                        }}
+                        className="flex w-full items-center gap-3 rounded-2xl border border-zinc-200 bg-white px-3.5 py-2.5 text-left text-[13px] text-zinc-800 transition-colors hover:border-[#E21321]/60 hover:bg-zinc-50"
+                      >
+                        <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-zinc-100 text-zinc-600">
+                          <i className="fa-sharp fa-regular fa-gear text-sm" aria-hidden />
+                        </span>
+                        <div className="flex flex-1 flex-col">
+                          <span className="font-medium">Добавить запчасть</span>
+                          <span className="text-[11px] text-zinc-500">
+                            Отдельные детали и комплектующие
+                          </span>
+                        </div>
+                      </button>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => setMobileAddOpen(false)}
+                      className="mt-3 w-full rounded-2xl border border-zinc-200 py-2 text-center text-[12px] font-medium text-zinc-600 hover:bg-zinc-50"
+                    >
+                      Отмена
+                    </button>
+                  </div>
+                </div>
+              )}
             </>
           ) : (
             <div className="flex items-center gap-6">

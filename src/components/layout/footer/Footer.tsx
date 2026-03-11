@@ -25,7 +25,7 @@ export default function Footer() {
             <div className={styles.footerColumn}>
               <h4 className={styles.footerTitle}>О сервисе</h4>
               <div className={styles.footerLinks}>
-                <Link href="#">О компании</Link>
+                <Link href={ROUTES.ABOUT}>О компании</Link>
                 <Link href={ROUTES.CONTACTS}>Контакты</Link>
               </div>
             </div>
@@ -35,8 +35,10 @@ export default function Footer() {
               <div className={styles.footerLinks}>
                 <Link href="#">Как пользоваться каталогом</Link>
                 <Link href="#">Как сделать заказ</Link>
-                <Link href="#">Условия и сроки доставки</Link>
-                <Link href="#">Партнерям</Link>
+                <Link href={ROUTES.DELIVERY_TERMS}>
+                  Условия и сроки доставки
+                </Link>
+                <Link href={ROUTES.PARTNERS}>Партнерям</Link>
               </div>
             </div>
 
@@ -47,7 +49,9 @@ export default function Footer() {
                   +374 91 101095
                 </Link>
                 <span className={styles.address}>Ереван, Армения</span>
-                <span className={styles.workHours}>Каждый день 10:00–20:00</span>
+                <span className={styles.workHours}>
+                  Каждый день 09:00–20:00
+                </span>
               </div>
             </div>
           </div>

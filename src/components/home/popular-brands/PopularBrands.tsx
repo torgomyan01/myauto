@@ -95,6 +95,11 @@ export default function PopularBrands({
   const { data, isLoading, isError } = useQuery<Brand[]>({
     queryKey: ['brands', segment],
     queryFn: () => getBrands(segment),
+    // Кэшируем список брендов на сутки, чтобы не дергать API лишний раз
+    staleTime: 1000 * 60 * 60 * 24, // 24 часа данные считаются свежими
+    cacheTime: 1000 * 60 * 60 * 24, // храним в кэше также 24 часа
+    refetchOnWindowFocus: false,
+    refetchOnReconnect: false,
   });
 
   const hasApiBrands = Array.isArray(data) && data.length > 0;
@@ -197,14 +202,6 @@ export default function PopularBrands({
                     <span className="truncate text-[11px] font-semibold text-slate-900 md:text-xs group-hover:text-[#E21321]">
                       {brand.name}
                     </span>
-                    <div className="mt-0.5 flex items-center gap-1.5">
-                      {isHighlighted && (
-                        <span className="inline-flex items-center gap-1 rounded-full bg-[#E21321]/6 px-2 py-[2px] text-[9px] font-semibold uppercase tracking-[0.12em] text-[#E21321]">
-                          <span className="h-1 w-1 rounded-full bg-[#E21321]" />
-                          хит
-                        </span>
-                      )}
-                    </div>
                   </div>
 
                   {/* arrow hint */}

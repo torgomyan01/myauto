@@ -20,6 +20,7 @@ model user {
   updatedAt            DateTime
   garageCars           GarageCar[]
   legalEntityVerifications LegalEntityVerification[]
+  notifications        Notification[]
 }
 
 model LegalEntityVerification {
@@ -39,6 +40,7 @@ model LegalEntityVerification {
   reviewedByUserId Int?
   @@index([userId])
   @@index([status])
+  @@unique([userId])
 }
 
 enum verification_status {
@@ -50,6 +52,22 @@ enum verification_status {
 enum user_role {
   USER
   ADMIN
+}
+
+model Notification {
+  id        Int      @id @default(autoincrement())
+  user      user     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  userId    Int
+  status    String   @db.VarChar(16)   // success | warning | error
+  title     String   @db.VarChar(255)
+  message   String   @db.VarChar(1024)
+  href      String?  @db.VarChar(512)
+  image     String?  @db.VarChar(512)
+  read      Boolean  @default(false)
+  createdAt DateTime @default(now())
+
+  @@index([userId])
+  @@index([read])
 }
 
 model GarageCar {

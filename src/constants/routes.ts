@@ -22,4 +22,8 @@ export const ROUTES = {
   ADD_PART_VERIFY: '/add/part/verify',
   ADMIN_VERIFICATIONS: '/admin/verifications',
   ADMIN_LEGAL_ENTITIES: '/admin/legal-entities',
+  ABOUT: '/about',
+  DELIVERY_TERMS: '/delivery',
+  PARTNERS: '/partners',
+  NOTIFICATIONS: '/notifications',
 } as const;

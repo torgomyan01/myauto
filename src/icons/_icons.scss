@@ -47,6 +47,18 @@
 .fa-plus:before {
   content: '\2b';
 }
+.fa-bell:before {
+  content: '\f0f3';
+}
+.fa-circle-check:before {
+  content: '\f058';
+}
+.fa-triangle-exclamation:before {
+  content: '\f071';
+}
+.fa-circle-xmark:before {
+  content: '\f057';
+}
 .fa-trash:before {
   content: '\f1f8';
 }
@@ -112,6 +124,15 @@
 }
 .fa-circle-info:before {
   content: '\f05a';
+}
+.fa-pen:before {
+  content: '\f304';
+}
+.fa-lock:before {
+  content: '\f023';
+}
+.fa-unlock:before {
+  content: '\f09c';
 }
 
 /* Admin sidebar */

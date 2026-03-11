@@ -1,9 +1,13 @@
 'use client';
 
-import { useState, useRef } from 'react';
+import { useEffect, useState, useRef } from 'react';
 import { useRouter } from 'next/navigation';
 import { uploadImage } from '@/app/actions/uploads';
-import { submitLegalEntityVerification } from '@/app/actions/legal-entity';
+import {
+  submitLegalEntityVerification,
+  getMyLegalEntityVerification,
+  type MyLegalEntityVerification,
+} from '@/app/actions/legal-entity';
 import { ROUTES } from '@/constants/routes';
 
 const AMOUNT = 1000;
@@ -18,6 +22,40 @@ export default function LegalEntityVerifyForm() {
   const [uploadProgress, setUploadProgress] = useState<'idle' | 'uploading' | 'done'>('idle');
   const [receiptFile, setReceiptFile] = useState<File | null>(null);
   const [receiptPreview, setReceiptPreview] = useState<string | null>(null);
+  const [initialData, setInitialData] = useState<MyLegalEntityVerification>(null);
+  const [formCompanyName, setFormCompanyName] = useState('');
+  const [formTaxId, setFormTaxId] = useState('');
+  const [formLegalAddress, setFormLegalAddress] = useState('');
+  const [existingReceiptPath, setExistingReceiptPath] = useState<string | null>(null);
+  const [initialLoading, setInitialLoading] = useState(true);
+
+  useEffect(() => {
+    let cancelled = false;
+
+    const load = async () => {
+      try {
+        const data = await getMyLegalEntityVerification();
+        if (cancelled) return;
+        if (data) {
+          setInitialData(data);
+          setFormCompanyName(data.companyName);
+          setFormTaxId(data.taxId);
+          setFormLegalAddress(data.legalAddress);
+          setExistingReceiptPath(data.paymentProofPath);
+        }
+      } catch (e) {
+        console.error('Failed to load legal entity verification', e);
+      } finally {
+        if (!cancelled) setInitialLoading(false);
+      }
+    };
+
+    load();
+
+    return () => {
+      cancelled = true;
+    };
+  }, []);
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -46,36 +84,46 @@ export default function LegalEntityVerifyForm() {
     setError(null);
     setLoading(true);
 
-    const form = e.currentTarget;
-    const formData = new FormData(form);
-    const companyName = (formData.get('companyName') as string)?.trim() ?? '';
-    const taxId = (formData.get('taxId') as string)?.trim() ?? '';
-    const legalAddress = (formData.get('legalAddress') as string)?.trim() ?? '';
+    const companyName = formCompanyName.trim();
+    const taxId = formTaxId.trim();
+    const legalAddress = formLegalAddress.trim();
 
-    if (!receiptFile) {
+    if (!companyName || !taxId || !legalAddress) {
+      setError('Заполните все поля');
+      setLoading(false);
+      return;
+    }
+
+    let paymentProofPath: string | undefined;
+
+    if (receiptFile) {
+      setUploadProgress('uploading');
+      const uploadFormData = new FormData();
+      uploadFormData.set('file', receiptFile);
+      const uploadResult = await uploadImage(uploadFormData);
+
+      if (!uploadResult.ok) {
+        setError(uploadResult.error);
+        setUploadProgress('idle');
+        setLoading(false);
+        return;
+      }
+
+      setUploadProgress('done');
+      paymentProofPath = uploadResult.path;
+    } else if (existingReceiptPath) {
+      paymentProofPath = existingReceiptPath;
+    } else {
       setError('Прикрепите чек об оплате');
       setLoading(false);
       return;
     }
 
-    setUploadProgress('uploading');
-    const uploadFormData = new FormData();
-    uploadFormData.set('file', receiptFile);
-    const uploadResult = await uploadImage(uploadFormData);
-
-    if (!uploadResult.ok) {
-      setError(uploadResult.error);
-      setUploadProgress('idle');
-      setLoading(false);
-      return;
-    }
-
-    setUploadProgress('done');
     const result = await submitLegalEntityVerification({
       companyName,
       taxId,
       legalAddress,
-      paymentProofPath: uploadResult.path,
+      paymentProofPath,
     });
 
     setLoading(false);
@@ -93,10 +141,37 @@ export default function LegalEntityVerifyForm() {
       <h1 className="text-xl font-semibold text-zinc-800 mb-1">
         Верификация юридического лица
       </h1>
-      <p className="text-zinc-600 text-sm mb-6">
-        Чтобы добавлять запчасти, нужно подтвердить статус юридического лица и
-        оплатить взнос 1000 драм.
+      <p className="text-zinc-600 text-sm mb-2">
+        Чтобы добавлять запчасти, нужно подтвердить статус юридического лица и оплатить взнос
+        1000 драм.
       </p>
+
+      {initialData && (
+        <div className="mb-4 rounded-lg border px-4 py-3 text-xs">
+          {initialData.status === 'PENDING' && (
+            <p className="text-amber-700 bg-amber-50 border border-amber-200 px-3 py-2 rounded-lg">
+              Заявка отправлена на проверку. Вы можете обновить данные и отправить повторно при
+              необходимости.
+            </p>
+          )}
+          {initialData.status === 'REJECTED' && (
+            <div className="space-y-2 rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-red-800">
+              <p className="font-medium text-sm">Заявка отклонена модератором.</p>
+              {initialData.rejectionReason && (
+                <p>
+                  <span className="font-semibold">Причина:</span> {initialData.rejectionReason}
+                </p>
+              )}
+              <p>Исправьте данные ниже и отправьте на проверку ещё раз.</p>
+            </div>
+          )}
+          {initialData.status === 'APPROVED' && (
+            <p className="rounded-lg border border-emerald-200 bg-emerald-50 px-3 py-2 text-emerald-800">
+              Заявка уже подтверждена. Изменение данных приведёт к повторной проверке.
+            </p>
+          )}
+        </div>
+      )}
 
       <div className="mb-6 rounded-lg bg-amber-50 border border-amber-200 p-4 text-sm text-amber-800">
         <p className="font-medium mb-1">Оплата</p>
@@ -127,6 +202,8 @@ export default function LegalEntityVerifyForm() {
             required
             className="w-full rounded-lg border border-zinc-300 px-3 py-2 text-zinc-800"
             placeholder="ООО «Пример»"
+            value={formCompanyName}
+            onChange={(e) => setFormCompanyName(e.target.value)}
           />
         </div>
 
@@ -144,6 +221,8 @@ export default function LegalEntityVerifyForm() {
             required
             className="w-full rounded-lg border border-zinc-300 px-3 py-2 text-zinc-800"
             placeholder="1234567890"
+            value={formTaxId}
+            onChange={(e) => setFormTaxId(e.target.value)}
           />
         </div>
 
@@ -161,6 +240,8 @@ export default function LegalEntityVerifyForm() {
             rows={3}
             className="w-full rounded-lg border border-zinc-300 px-3 py-2 text-zinc-800"
             placeholder="Город, улица, дом, офис"
+            value={formLegalAddress}
+            onChange={(e) => setFormLegalAddress(e.target.value)}
           />
         </div>
 
@@ -175,10 +256,10 @@ export default function LegalEntityVerifyForm() {
             onChange={handleFileChange}
             className="w-full text-sm text-zinc-600 file:mr-3 file:rounded-lg file:border-0 file:bg-zinc-100 file:px-4 file:py-2 file:text-sm file:font-medium file:text-zinc-800 hover:file:bg-zinc-200"
           />
-          {receiptPreview && (
+          {(receiptPreview || existingReceiptPath) && (
             <div className="mt-2 flex items-start gap-2">
               <img
-                src={receiptPreview}
+                src={receiptPreview || existingReceiptPath || ''}
                 alt="Чек"
                 className="max-h-40 rounded-lg border border-zinc-200 object-contain"
               />

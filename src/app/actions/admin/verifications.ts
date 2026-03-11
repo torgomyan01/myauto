@@ -4,6 +4,7 @@ import { revalidatePath } from 'next/cache';
 import { getAuthSession } from '@/lib/auth-server';
 import { prisma } from '@/lib/prisma';
 import { ROUTES } from '@/constants/routes';
+import { createNotificationForUser } from '@/app/actions/notifications';
 
 async function ensureAdmin(): Promise<{ user: { id: string; role: string }; [key: string]: unknown }> {
   const session = await getAuthSession();
@@ -84,6 +85,14 @@ export async function approveVerification(id: number): Promise<{ ok: true } | { 
     }),
   ]);
 
+  await createNotificationForUser({
+    userId: verification.userId,
+    status: 'success',
+    title: 'Юридическое лицо подтверждено',
+    message: `Ваша организация "${verification.companyName}" успешно верифицирована.`,
+    href: ROUTES.ADD_PART,
+  });
+
   revalidatePath(ROUTES.ADMIN_VERIFICATIONS);
   revalidatePath(ROUTES.ADMIN_LEGAL_ENTITIES);
   revalidatePath(ROUTES.ADMIN);
@@ -113,6 +122,58 @@ export async function rejectVerification(
       reviewedAt: new Date(),
       reviewedByUserId: adminId,
     },
+  });
+
+  await createNotificationForUser({
+    userId: verification.userId,
+    status: 'warning',
+    title: 'Заявка на верификацию отклонена',
+    message: reason || 'Пожалуйста, исправьте данные и отправьте заявку повторно.',
+    href: ROUTES.ADD_PART,
+  });
+
+  revalidatePath(ROUTES.ADMIN_VERIFICATIONS);
+  revalidatePath(ROUTES.ADMIN_LEGAL_ENTITIES);
+  revalidatePath(ROUTES.ADMIN);
+  return { ok: true };
+}
+
+export async function blockUserAndVerification(
+  id: number,
+  reason: string
+): Promise<{ ok: true } | { ok: false; error: string }> {
+  const session = await ensureAdmin();
+  const adminId = Number(session.user.id);
+
+  const verification = await prisma.legalEntityVerification.findUnique({
+    where: { id },
+  });
+  if (!verification) return { ok: false, error: 'Заявка не найдена' };
+
+  await prisma.$transaction([
+    prisma.legalEntityVerification.update({
+      where: { id },
+      data: {
+        status: 'REJECTED',
+        rejectionReason: reason.slice(0, 512),
+        reviewedAt: new Date(),
+        reviewedByUserId: adminId,
+      },
+    }),
+    prisma.user.update({
+      where: { id: verification.userId },
+      data: { blocked: true },
+    }),
+  ]);
+
+  await createNotificationForUser({
+    userId: verification.userId,
+    status: 'error',
+    title: 'Ваша учетная запись заблокирована',
+    message:
+      reason ||
+      'Ваша учетная запись заблокирована администрацией. Пожалуйста, свяжитесь с поддержкой.',
+    href: ROUTES.CONTACTS,
   });
 
   revalidatePath(ROUTES.ADMIN_VERIFICATIONS);
