@@ -12,6 +12,7 @@ import GarageDropdown from './GarageDropdown';
 import UserDropdown from './UserDropdown';
 import { NotificationsDropdown } from './NotificationsDropdown';
 import { searchCatalog } from '@/app/actions/search';
+import { searchAutopiterByNumber } from '@/lib/autopiter';
 
 interface HeaderClientProps {
   session: Session | null;
@@ -49,6 +50,14 @@ interface SearchResultPayload {
   kind: 'vin' | 'oem' | 'name';
   parts: SearchPartResult[];
   cars: SearchCarResult[];
+  autopiterParts?: {
+    articleId: number;
+    catalogId: number;
+    catalogName: string;
+    name: string;
+    number: string;
+    salesRating: number;
+  }[];
 }
 
 
@@ -95,9 +104,37 @@ export default function HeaderClient({ session }: HeaderClientProps) {
     setSearchError(null);
 
     try {
-      const data = await searchCatalog(query);
+      // Определяем тип запроса:
+      // - только цифры или очень мало букв (<=1) → номер детали (OEM/артикул)
+      // - есть хотя бы 2 буквы → VIN / текстовый поиск
+      const letters = query.match(/[A-Za-z]/g) || [];
+      const isDigitsOnly = /^[0-9]+$/.test(query);
+      const isPartNumber = isDigitsOnly || letters.length <= 1;
 
-      setSearchResults(data);
+      if (isPartNumber) {
+        // Поиск по номеру детали через партнёрский сервис (Autopiter)
+        const autopiter = await searchAutopiterByNumber(query);
+
+         // Временный лог для отладки в браузере
+         // eslint-disable-next-line no-console
+         console.log('[Autopiter] FindCatalog result (first 5):', autopiter.slice(0, 5));
+
+        setSearchResults({
+          query,
+          kind: 'oem',
+          parts: [],
+          cars: [],
+          autopiterParts: autopiter,
+        });
+      } else {
+        // VIN / обычный поиск через нашу внутреннюю логику
+        const data = await searchCatalog(query);
+        setSearchResults({
+          ...data,
+          autopiterParts: [],
+        });
+      }
+
       setShowSearchDrop(true);
     } catch (error) {
       console.error('Search API error', error);
@@ -226,7 +263,7 @@ export default function HeaderClient({ session }: HeaderClientProps) {
                       </div>
                     )}
 
-                    {/* Детали: по номеру/названию */}
+                    {/* Детали: по номеру/названию (внутренняя БД) */}
                     {searchResults.kind !== 'vin' &&
                       searchResults.parts.slice(0, 5).map((part) => (
                         <div className={styles.infoLine} key={part.id}>
@@ -238,6 +275,41 @@ export default function HeaderClient({ session }: HeaderClientProps) {
                           <span>{part.brand ?? part.name}</span>
                         </div>
                       ))}
+
+                    {/* Партнёрский сервис (Autopiter) по номеру детали */}
+                    {searchResults.autopiterParts &&
+                      searchResults.autopiterParts.length > 0 && (
+                        <>
+                          <div className={`${styles.infoLine} !border-t pt-2 mt-2`}>
+                            <span className="text-[11px] font-medium uppercase tracking-wide text-zinc-500">
+                              Партнёрские предложения (Autopiter)
+                            </span>
+                          </div>
+                          {searchResults.autopiterParts.slice(0, 5).map((p) => (
+                            <div
+                              key={`${p.articleId}-${p.catalogId}-${p.number}`}
+                              className={styles.infoLine}
+                            >
+                              <i
+                                className="fa-solid fa-hashtag text-[14px]"
+                                aria-hidden
+                              />
+                              <b>{p.number}</b>
+                              <span className="truncate">
+                                {p.name}{' '}
+                                <span className="text-[11px] text-zinc-400">
+                                  · {p.catalogName}
+                                </span>
+                              </span>
+                              {p.salesRating > 0 && (
+                                <span className="ml-auto rounded-full bg-emerald-50 px-1.5 py-[1px] text-[10px] font-medium text-emerald-700">
+                                  Рейтинг {p.salesRating}/10
+                                </span>
+                              )}
+                            </div>
+                          ))}
+                        </>
+                      )}
 
                     {((searchResults.kind === 'vin' &&
                       searchResults.cars.length === 0) ||
