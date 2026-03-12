@@ -132,7 +132,7 @@ export default function Banner() {
           <button
             type="button"
             onClick={() => swiperRef.current?.slideNext()}
-            className="absolute right-2 top-1/2 z-10 flex h-8 w-8 -translate-y-1/2 cursor-pointer items-center justify-center rounded-full bg-slate-900/80 text-sm text-slate-100 shadow-md transition hover:bg-slate-800"
+            className="absolute right-2 top-1/2 z-10 flex h-8 w-8 -translate-y-1/2 cursor-pointer items-center justify-center rounded-full bg-white text-sm text-slate-100 shadow-md transition hover:bg-slate-800"
             aria-label="Следующий баннер"
           >
             ›

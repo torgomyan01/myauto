@@ -1,5 +1,6 @@
 'use server';
 
+import axios from 'axios';
 import { XMLParser } from 'fast-xml-parser';
 import { env } from 'process';
 
@@ -33,7 +34,7 @@ async function callAutopiterSoap(
   bodyInnerXml: string,
   cookie?: string,
   soapAction?: string
-): Promise<{ xml: string; cookie?: string }> {
+): Promise<{ xml: string; cookies?: string[] }> {
   const envelope = `
 <soap:Envelope xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xmlns:xsd="http://www.w3.org/2001/XMLSchema" xmlns:soap="http://schemas.xmlsoap.org/soap/envelope/">
   <soap:Body>
@@ -50,17 +51,17 @@ async function callAutopiterSoap(
     headers.SOAPAction = `"${soapAction}"`;
   }
 
-  const res = await fetch(AUTOPITER_BASE_URL, {
-    method: 'POST',
+  const res = await axios.post(AUTOPITER_BASE_URL, envelope, {
     headers,
-    body: envelope,
-    cache: 'no-store',
+    responseType: 'text',
+    // SOAP сервис всегда должен вызываться напрямую, без кэша
+    validateStatus: () => true,
   });
 
-  const xml = await res.text();
-  const setCookie = res.headers.get('set-cookie') ?? undefined;
+  const xml: string = res.data;
+  const cookies = res.headers['set-cookie'] as string[] | undefined;
 
-  return { xml, cookie: setCookie };
+  return { xml, cookies };
 }
 
 async function authorize(): Promise<string | undefined> {
@@ -73,7 +74,7 @@ async function authorize(): Promise<string | undefined> {
   <Save>true</Save>
 </Authorization>`;
 
-  const { xml, cookie: setCookie } = await callAutopiterSoap(
+  const { xml, cookies } = await callAutopiterSoap(
     body,
     undefined,
     'http://www.autopiter.ru/Authorization'
@@ -122,37 +123,41 @@ async function authorize(): Promise<string | undefined> {
   }
 
   // Если авторизация не вернула cookie, залогируем XML для отладки
-  if (!setCookie) {
+  if (!cookies || cookies.length === 0) {
     // eslint-disable-next-line no-console
     console.error('[Autopiter] Authorization: no Set-Cookie header', xml);
     return undefined;
   }
 
-  // В заголовке Set-Cookie обычно приходит что-то вроде:
-  // AuthCoocies=XXX; path=/; HttpOnly
-  // Для заголовка Cookie нужно вытащить именно AuthCoocies=...
-  const match = setCookie.match(/AuthCoocies=[^;]+/);
-  const firstCookie = match?.[0]?.trim();
+  // В ответе может быть несколько Set-Cookie с AuthCoocies.
+  // Берём последнее значение AuthCoocies=... (как в браузере/клиенте).
+  let authCookie: string | undefined;
+  for (const c of cookies) {
+    const match = c.match(/AuthCoocies=[^;]+/);
+    if (match?.[0]) {
+      authCookie = match[0].trim();
+    }
+  }
 
-  if (!firstCookie) {
+  if (!authCookie) {
     // eslint-disable-next-line no-console
     console.error(
       '[Autopiter] Failed to parse AuthCoocies from Set-Cookie',
-      setCookie
+      cookies
     );
     return undefined;
   }
 
-  return firstCookie;
+  return authCookie;
 }
 
+// Совпадает с форматом ответа FindCatalog (SearchCatalogModel)
 export interface AutopiterCatalogItem {
-  articleId: number;
-  catalogId: number;
-  catalogName: string;
-  name: string;
-  number: string;
-  salesRating: number;
+  ArticleId: number;
+  CatalogName: string;
+  Name: string;
+  Number: string | number;
+  SalesRating: number;
 }
 
 export async function searchAutopiterByNumber(
@@ -175,8 +180,6 @@ export async function searchAutopiterByNumber(
 
   try {
     const doc = parser.parse(xml);
-
-    console.log(doc);
 
     const envelope =
       doc['soap:Envelope'] ??
@@ -258,42 +261,7 @@ export async function searchAutopiterByNumber(
       }
     }
 
-    console.log(itemsRaw, 5555555555555);
-
-    const array = Array.isArray(itemsRaw)
-      ? itemsRaw
-      : itemsRaw
-        ? [itemsRaw]
-        : [];
-
-    const mapped: AutopiterCatalogItem[] = array
-      .map((item: any) => {
-        const articleId = Number(item.ArticleId ?? item.articleId ?? item.id);
-        const catalogId = Number(
-          item.CatalogId ?? item.catalogId ?? item.idCatalog
-        );
-        const catalogName =
-          String(item.CatalogName ?? item.catalogName ?? item.Name ?? '') || '';
-        const name = String(item.Name ?? item.NameDetail ?? '') || '';
-        const num = String(item.Number ?? item.ShortNumber ?? '') || '';
-        const salesRating = Number(item.SalesRating ?? 0);
-
-        if (!articleId || !catalogId || !num || !name) {
-          return null;
-        }
-
-        return {
-          articleId,
-          catalogId,
-          catalogName,
-          name,
-          number: num,
-          salesRating: Number.isFinite(salesRating) ? salesRating : 0,
-        };
-      })
-      .filter(Boolean) as AutopiterCatalogItem[];
-
-    return mapped;
+    return itemsRaw as AutopiterCatalogItem[];
   } catch (e) {
     // eslint-disable-next-line no-console
     console.error('[Autopiter] Failed to parse FindCatalog response', e);

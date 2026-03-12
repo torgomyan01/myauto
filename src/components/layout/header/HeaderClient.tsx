@@ -11,6 +11,7 @@ import LanguageSelect from './LanguageSelect';
 import GarageDropdown from './GarageDropdown';
 import UserDropdown from './UserDropdown';
 import { NotificationsDropdown } from './NotificationsDropdown';
+import { HeaderSearch } from './HeaderSearch';
 import { searchCatalog } from '@/app/actions/search';
 import { searchAutopiterByNumber } from '@/lib/autopiter';
 
@@ -51,15 +52,13 @@ interface SearchResultPayload {
   parts: SearchPartResult[];
   cars: SearchCarResult[];
   autopiterParts?: {
-    articleId: number;
-    catalogId: number;
-    catalogName: string;
-    name: string;
-    number: string;
-    salesRating: number;
+    ArticleId: number;
+    CatalogName: string;
+    Name: string;
+    Number: string | number;
+    SalesRating: number;
   }[];
 }
-
 
 export default function HeaderClient({ session }: HeaderClientProps) {
   const router = useRouter();
@@ -114,11 +113,6 @@ export default function HeaderClient({ session }: HeaderClientProps) {
       if (isPartNumber) {
         // Поиск по номеру детали через партнёрский сервис (Autopiter)
         const autopiter = await searchAutopiterByNumber(query);
-
-         // Временный лог для отладки в браузере
-         // eslint-disable-next-line no-console
-         console.log('[Autopiter] FindCatalog result (first 5):', autopiter.slice(0, 5));
-
         setSearchResults({
           query,
           kind: 'oem',
@@ -154,178 +148,7 @@ export default function HeaderClient({ session }: HeaderClientProps) {
             <Image src="/img/logo.svg" alt="MyAuto" width={160} height={40} />
           </Link>
 
-          <div className={styles.formWrap} ref={formRef}>
-            {isSearchFocused && (
-              <div
-                className="fixed inset-0 bg-slate-900/40 backdrop-blur-[1px]"
-                onClick={() => setIsSearchFocused(false)}
-              />
-            )}
-            <form onSubmit={handleSearch} className="relative z-100">
-              <input
-                type="text"
-                placeholder="Введите VIN, номер или название детали"
-                value={searchValue}
-                onFocus={() => setIsSearchFocused(true)}
-                onChange={(e) => {
-                  setSearchValue(e.target.value);
-                }}
-              />
-              <button type="submit" className={styles.searchBtn}>
-                <i
-                  className="fa-solid fa-magnifying-glass text-[18px]"
-                  aria-hidden
-                />
-              </button>
-            </form>
-
-            <div
-              className={`${styles.formHideContent} ${showSearchDrop ? styles.show : ''}`}
-            >
-              <div className={styles.topLine}>
-                <div className="checkbox-wrap">
-                  <label>
-                    <input type="checkbox" />
-                    <span></span>
-                    Искать детали для авто из гаража
-                  </label>
-                </div>
-                <span className={styles.marka}>
-                  {searchResults?.kind === 'vin'
-                    ? 'Поиск по VIN'
-                    : searchResults?.kind === 'oem'
-                      ? 'Поиск по номеру детали'
-                      : 'Поиск по названию'}
-                </span>
-              </div>
-
-              <div className={styles.info}>
-                {searchLoading && (
-                  <div className={styles.infoLine}>
-                    <span className="text-xs text-gray-500">Идёт поиск...</span>
-                  </div>
-                )}
-
-                {searchError && !searchLoading && (
-                  <div className={styles.infoLine}>
-                    <span className="text-xs text-red-500">{searchError}</span>
-                  </div>
-                )}
-
-                {!searchLoading && !searchError && searchResults && (
-                  <>
-                    {/* VIN: показываем авто — клик ведёт на схему/группы деталей */}
-                    {searchResults.kind === 'vin' && (
-                      <div className="max-h-56 overflow-y-auto pr-1">
-                        {searchResults.cars.map((car) => {
-                          const region = car.parameters?.find(
-                            (p) => p.key === 'sales_region'
-                          )?.value;
-                          const canGoToGroups =
-                            car.typeId &&
-                            car.markId &&
-                            car.modelId &&
-                            car.modificationId;
-                          const groupsUrl = canGoToGroups
-                            ? `${ROUTES.BRAND_MODEL_GROUPS}?type=${encodeURIComponent(car.typeId!)}&mark=${encodeURIComponent(car.markId!)}&model=${encodeURIComponent(car.modelId!)}&modification=${encodeURIComponent(car.modificationId!)}&name=${encodeURIComponent(car.modificationName ?? car.model ?? '')}`
-                            : null;
-                          return (
-                            <div
-                              className={styles.infoLine}
-                              key={car.id}
-                              role={groupsUrl ? 'button' : undefined}
-                              onClick={() => {
-                                if (groupsUrl) {
-                                  setShowSearchDrop(false);
-                                  router.push(groupsUrl);
-                                }
-                              }}
-                              style={
-                                groupsUrl
-                                  ? {
-                                      cursor: 'pointer',
-                                    }
-                                  : undefined
-                              }
-                            >
-                              <b>
-                                {car.brand
-                                  ? `${car.brand} ${car.model}`
-                                  : car.model}
-                              </b>
-                              <span>
-                                {car.years ? ` · ${car.years}` : ''}
-                                {region ? ` · ${region}` : ''}
-                              </span>
-                            </div>
-                          );
-                        })}
-                      </div>
-                    )}
-
-                    {/* Детали: по номеру/названию (внутренняя БД) */}
-                    {searchResults.kind !== 'vin' &&
-                      searchResults.parts.slice(0, 5).map((part) => (
-                        <div className={styles.infoLine} key={part.id}>
-                          <i
-                            className="fa-solid fa-hashtag text-[14px]"
-                            aria-hidden
-                          />
-                          <b>{part.number}</b>
-                          <span>{part.brand ?? part.name}</span>
-                        </div>
-                      ))}
-
-                    {/* Партнёрский сервис (Autopiter) по номеру детали */}
-                    {searchResults.autopiterParts &&
-                      searchResults.autopiterParts.length > 0 && (
-                        <>
-                          <div className={`${styles.infoLine} !border-t pt-2 mt-2`}>
-                            <span className="text-[11px] font-medium uppercase tracking-wide text-zinc-500">
-                              Партнёрские предложения (Autopiter)
-                            </span>
-                          </div>
-                          {searchResults.autopiterParts.slice(0, 5).map((p) => (
-                            <div
-                              key={`${p.articleId}-${p.catalogId}-${p.number}`}
-                              className={styles.infoLine}
-                            >
-                              <i
-                                className="fa-solid fa-hashtag text-[14px]"
-                                aria-hidden
-                              />
-                              <b>{p.number}</b>
-                              <span className="truncate">
-                                {p.name}{' '}
-                                <span className="text-[11px] text-zinc-400">
-                                  · {p.catalogName}
-                                </span>
-                              </span>
-                              {p.salesRating > 0 && (
-                                <span className="ml-auto rounded-full bg-emerald-50 px-1.5 py-[1px] text-[10px] font-medium text-emerald-700">
-                                  Рейтинг {p.salesRating}/10
-                                </span>
-                              )}
-                            </div>
-                          ))}
-                        </>
-                      )}
-
-                    {((searchResults.kind === 'vin' &&
-                      searchResults.cars.length === 0) ||
-                      (searchResults.kind !== 'vin' &&
-                        searchResults.parts.length === 0)) && (
-                      <div className={styles.infoLine}>
-                        <span className="text-xs text-gray-500">
-                          Ничего не найдено по запросу «{searchResults.query}».
-                        </span>
-                      </div>
-                    )}
-                  </>
-                )}
-              </div>
-            </div>
-          </div>
+          <HeaderSearch />
 
           {session ? (
             <>
@@ -432,7 +255,10 @@ export default function HeaderClient({ session }: HeaderClientProps) {
                     className="flex flex-1 flex-col items-center gap-0.5 px-1"
                   >
                     <span className="flex h-8 w-8 items-center justify-center rounded-full bg-zinc-100 text-zinc-700">
-                      <i className="fa-regular fa-cart-shopping text-[15px]" aria-hidden />
+                      <i
+                        className="fa-regular fa-cart-shopping text-[15px]"
+                        aria-hidden
+                      />
                     </span>
                     <span className="text-[10px]">Корзина</span>
                   </Link>
@@ -442,7 +268,10 @@ export default function HeaderClient({ session }: HeaderClientProps) {
                     className="flex flex-1 flex-col items-center gap-0.5 px-1"
                   >
                     <span className="flex h-8 w-8 items-center justify-center rounded-full bg-zinc-100 text-zinc-700">
-                      <i className="fa-regular fa-car text-[15px]" aria-hidden />
+                      <i
+                        className="fa-regular fa-car text-[15px]"
+                        aria-hidden
+                      />
                     </span>
                     <span className="text-[10px]">Гараж</span>
                   </Link>
@@ -453,7 +282,10 @@ export default function HeaderClient({ session }: HeaderClientProps) {
                     className="flex flex-1 flex-col items-center gap-0.5 px-1"
                   >
                     <span className="flex h-9 w-9 items-center justify-center rounded-full bg-[#E21321] text-white shadow-[0_8px_20px_rgba(226,19,33,0.55)]">
-                      <i className="fa-regular fa-plus text-[15px]" aria-hidden />
+                      <i
+                        className="fa-regular fa-plus text-[15px]"
+                        aria-hidden
+                      />
                     </span>
                     <span className="text-[10px] text-zinc-700">Добавить</span>
                   </button>
@@ -463,7 +295,10 @@ export default function HeaderClient({ session }: HeaderClientProps) {
                     className="flex flex-1 flex-col items-center gap-0.5 px-1"
                   >
                     <span className="flex h-8 w-8 items-center justify-center rounded-full bg-zinc-100 text-zinc-700">
-                      <i className="fa-regular fa-bell text-[15px]" aria-hidden />
+                      <i
+                        className="fa-regular fa-bell text-[15px]"
+                        aria-hidden
+                      />
                     </span>
                     <span className="text-[10px]">Уведомления</span>
                   </Link>
@@ -473,7 +308,10 @@ export default function HeaderClient({ session }: HeaderClientProps) {
                     className="flex flex-1 flex-col items-center gap-0.5 px-1"
                   >
                     <span className="flex h-8 w-8 items-center justify-center rounded-full bg-zinc-100 text-zinc-700">
-                      <i className="fa-regular fa-user text-[15px]" aria-hidden />
+                      <i
+                        className="fa-regular fa-user text-[15px]"
+                        aria-hidden
+                      />
                     </span>
                     <span className="text-[10px]">Профиль</span>
                   </Link>
@@ -494,7 +332,8 @@ export default function HeaderClient({ session }: HeaderClientProps) {
                       Что вы хотите добавить?
                     </h2>
                     <p className="mb-4 text-center text-[11px] text-zinc-500">
-                      Выберите тип объявления. Вы всегда сможете добавить больше позже.
+                      Выберите тип объявления. Вы всегда сможете добавить больше
+                      позже.
                     </p>
                     <div className="space-y-2.5">
                       <button
@@ -509,7 +348,9 @@ export default function HeaderClient({ session }: HeaderClientProps) {
                           <i className="fa-solid fa-car text-sm" aria-hidden />
                         </span>
                         <div className="flex flex-1 flex-col">
-                          <span className="font-medium">Добавить объявление</span>
+                          <span className="font-medium">
+                            Добавить объявление
+                          </span>
                           <span className="text-[11px] text-zinc-500">
                             Продажа автомобиля целиком
                           </span>
@@ -524,7 +365,10 @@ export default function HeaderClient({ session }: HeaderClientProps) {
                         className="flex w-full items-center gap-3 rounded-2xl border border-zinc-200 bg-white px-3.5 py-2.5 text-left text-[13px] text-zinc-800 transition-colors hover:border-[#E21321]/60 hover:bg-zinc-50"
                       >
                         <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-zinc-100 text-zinc-600">
-                          <i className="fa-sharp fa-regular fa-gear text-sm" aria-hidden />
+                          <i
+                            className="fa-sharp fa-regular fa-gear text-sm"
+                            aria-hidden
+                          />
                         </span>
                         <div className="flex flex-1 flex-col">
                           <span className="font-medium">Добавить запчасть</span>
