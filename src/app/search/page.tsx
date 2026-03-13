@@ -3,26 +3,29 @@
 import { useEffect, useMemo, useState } from 'react';
 import Image from 'next/image';
 import Link from 'next/link';
-import { useSearchParams } from 'next/navigation';
+import { useRouter, useSearchParams } from 'next/navigation';
 import MainTemplate from '@/components/layout/main-template/MainTemplate';
 import AddToCartModal, {
   type CartProduct,
 } from '@/components/home/add-to-cart-modal/AddToCartModal';
 import { ROUTES } from '@/constants/routes';
-import { searchCatalog, type SearchPartResult } from '@/app/actions/search';
-
-const allProducts: CartProduct[] = Array.from({ length: 12 }, (_, i) => ({
-  id: i + 1,
-  name: 'Teboil Gold L 5W-30, 4л.',
-  description: 'Teboil Gold 5W-30 4 л. Масло моторное',
-  price: 6500,
-  img: 'product-img.png',
-}));
+import { addGarageCar } from '@/app/actions/garage';
+import {
+  searchCatalog,
+  type SearchPartResult,
+  type SearchCarResult,
+  type SearchQueryKind,
+} from '@/app/actions/search';
+import {
+  searchAutopiterByNumber,
+  type AutopiterCatalogItem,
+} from '@/lib/autopiter';
 
 const BRANDS = ['Ravenol', 'Mobil', 'Toyota', 'Shell', 'Honda', 'Comma'];
 const VISCOSITIES = ['0W-20', '0W-40', '5W-30', '10W-30', '15W-40', '0W-30'];
 
 export default function SearchPage() {
+  const router = useRouter();
   const [selectedBrands, setSelectedBrands] = useState<string[]>(['Mobil']);
   const [selectedViscosities, setSelectedViscosities] = useState<string[]>([
     '5W-30',
@@ -35,8 +38,17 @@ export default function SearchPage() {
   const [favorites, setFavorites] = useState<number[]>([]);
   const [mobileFiltersOpen, setMobileFiltersOpen] = useState(false);
   const [searchParts, setSearchParts] = useState<SearchPartResult[]>([]);
+  const [searchCars, setSearchCars] = useState<SearchCarResult[]>([]);
+  const [searchKind, setSearchKind] = useState<SearchQueryKind>('name');
+  const [autopiterParts, setAutopiterParts] = useState<AutopiterCatalogItem[]>(
+    []
+  );
   const [searchLoading, setSearchLoading] = useState(false);
   const [searchError, setSearchError] = useState<string | null>(null);
+  const [addGarageLoadingId, setAddGarageLoadingId] = useState<string | null>(
+    null
+  );
+  const [addGarageMessage, setAddGarageMessage] = useState<string | null>(null);
 
   const searchParams = useSearchParams();
   const query = searchParams.get('q') ?? '';
@@ -88,6 +100,9 @@ export default function SearchPage() {
   useEffect(() => {
     if (!query.trim()) {
       setSearchParts([]);
+      setSearchCars([]);
+      setSearchKind('name');
+       setAutopiterParts([]);
       setSearchError(null);
       setSearchLoading(false);
       return;
@@ -100,14 +115,28 @@ export default function SearchPage() {
       setSearchError(null);
       try {
         const data = await searchCatalog(query);
+        let autopiter: AutopiterCatalogItem[] = [];
+
+        if (data.kind !== 'vin') {
+          try {
+            autopiter = await searchAutopiterByNumber(query);
+          } catch (e) {
+            console.error('Autopiter search error', e);
+          }
+        }
+
         if (!cancelled) {
+          setSearchKind(data.kind);
+          setSearchCars(Array.isArray(data.cars) ? data.cars : []);
           setSearchParts(Array.isArray(data.parts) ? data.parts : []);
+          setAutopiterParts(autopiter);
         }
       } catch (error) {
         if (cancelled) return;
         console.error('Search page API error', error);
         setSearchError('Не удалось выполнить поиск. Попробуйте позже.');
         setSearchParts([]);
+        setAutopiterParts([]);
       } finally {
         if (!cancelled) setSearchLoading(false);
       }
@@ -121,7 +150,7 @@ export default function SearchPage() {
   }, [query]);
 
   const productsToShow: CartProduct[] = useMemo(() => {
-    if (searchParts.length === 0) return allProducts;
+    if (searchParts.length === 0) return [];
 
     return searchParts.map((part, index) => ({
       id: index + 1,
@@ -131,6 +160,27 @@ export default function SearchPage() {
       img: 'product-img.png',
     }));
   }, [searchParts]);
+
+  const handleAddToGarage = async (car: SearchCarResult) => {
+    if (!car.vin) {
+      setAddGarageMessage('Для этого автомобиля VIN не найден.');
+      return;
+    }
+    setAddGarageMessage(null);
+    setAddGarageLoadingId(car.id);
+    try {
+      await addGarageCar(car.vin);
+      setAddGarageMessage('Автомобиль добавлен в ваш гараж.');
+    } catch (e: any) {
+      const msg =
+        typeof e?.message === 'string'
+          ? e.message
+          : 'Не удалось добавить автомобиль в гараж.';
+      setAddGarageMessage(msg);
+    } finally {
+      setAddGarageLoadingId(null);
+    }
+  };
 
   const Filters = ({ isMobile = false }: { isMobile?: boolean }) => (
     <>
@@ -350,11 +400,20 @@ export default function SearchPage() {
           <h1 className="text-xl md:text-2xl font-semibold text-gray-900 mb-4">
             Результаты поиска
           </h1>
-          <p className="text-sm text-gray-500 mb-6">
+          <p className="text-sm text-gray-500 mb-2">
             {query
               ? `Запрос: «${query}»`
               : `Найдено товаров: ${productsToShow.length}`}
           </p>
+          {query && (
+            <p className="text-xs text-gray-400 mb-4">
+              {searchKind === 'vin'
+                ? 'Режим: поиск по VIN / авто'
+                : searchKind === 'oem'
+                  ? 'Режим: поиск по номеру детали'
+                  : 'Режим: поиск по названию детали'}
+            </p>
+          )}
 
           {searchLoading && (
             <p className="text-sm text-gray-500 mb-4">Идёт поиск запчастей…</p>
@@ -362,6 +421,133 @@ export default function SearchPage() {
           {searchError && !searchLoading && (
             <p className="text-sm text-red-500 mb-4">{searchError}</p>
           )}
+          {addGarageMessage && (
+            <p className="text-xs text-gray-500 mb-4">{addGarageMessage}</p>
+          )}
+
+          {/* VIN / авто: список подходящих автомобилей и переход в группы деталей */}
+          {!searchLoading &&
+            !searchError &&
+            query &&
+            searchKind === 'vin' &&
+            searchCars.length > 0 && (
+              <div className="mb-6 space-y-2">
+                <h2 className="text-sm font-semibold text-gray-800">
+                  Найденные автомобили по VIN / описанию
+                </h2>
+                <div className="max-h-60 overflow-y-auto rounded-2xl border border-gray-100 bg-white/80 p-3 shadow-sm">
+                  {searchCars.map((car) => {
+                    const region = car.parameters?.find(
+                      (p) => p.key === 'sales_region'
+                    )?.value;
+                    const canGoToGroups =
+                      car.typeId &&
+                      car.markId &&
+                      car.modelId &&
+                      car.modificationId;
+                    const groupsUrl = canGoToGroups
+                      ? `${ROUTES.BRAND_MODEL_GROUPS}?type=${encodeURIComponent(
+                          car.typeId!
+                        )}&mark=${encodeURIComponent(
+                          car.markId!
+                        )}&model=${encodeURIComponent(
+                          car.modelId!
+                        )}&modification=${encodeURIComponent(
+                          car.modificationId!
+                        )}&name=${encodeURIComponent(
+                          car.modificationName ?? car.model ?? ''
+                        )}`
+                      : null;
+
+                    const isAdding = addGarageLoadingId === car.id;
+
+                    return (
+                      <div
+                        key={car.id}
+                        className="flex w-full items-center justify-between gap-3 rounded-xl px-3 py-2 text-sm transition-colors hover:bg-gray-50"
+                      >
+                        <button
+                          type="button"
+                          onClick={() => {
+                            if (groupsUrl) router.push(groupsUrl);
+                          }}
+                          className="flex flex-1 flex-col items-start text-left"
+                        >
+                          <span className="font-medium text-gray-900">
+                            {car.brand
+                              ? `${car.brand} ${car.model}`
+                              : car.model}
+                          </span>
+                          <span className="text-xs text-gray-500">
+                            {car.years}
+                          </span>
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => handleAddToGarage(car)}
+                          disabled={isAdding}
+                          className="inline-flex items-center gap-1 rounded-lg border border-gray-200 bg-white px-2.5 py-1.5 text-[11px] font-medium text-gray-800 hover:bg-gray-50 disabled:cursor-not-allowed disabled:opacity-60"
+                        >
+                          {isAdding ? (
+                            <span className="h-3 w-3 animate-spin rounded-full border-[2px] border-gray-300 border-t-[#E21321]" />
+                          ) : (
+                            <i className="fa-regular fa-car-side text-xs" />
+                          )}
+                          <span>В гараж</span>
+                        </button>
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+            )}
+
+          {!searchLoading &&
+            !searchError &&
+            productsToShow.length === 0 &&
+            query &&
+            searchKind !== 'vin' && (
+              <p className="mb-4 text-sm text-gray-500">
+                По запросу «{query}» ничего не найдено в основной базе.
+              </p>
+            )}
+
+          {/* Autopiter results for part number / name */}
+          {!searchLoading &&
+            !searchError &&
+            query &&
+            searchKind !== 'vin' &&
+            autopiterParts.length > 0 && (
+              <div className="mb-6">
+                <h2 className="mb-2 text-sm font-semibold text-gray-800">
+                  Результаты партнёрского сервиса Autopiter
+                </h2>
+                <div className="max-h-60 overflow-y-auto rounded-2xl border border-gray-100 bg-white/80 p-3 shadow-sm space-y-1.5">
+                  {autopiterParts.slice(0, 50).map((p) => (
+                    <div
+                      key={`${p.ArticleId}-${p.CatalogName}-${p.Number}`}
+                      className="flex items-center gap-3 rounded-xl px-3 py-2 text-sm hover:bg-gray-50 transition-colors"
+                    >
+                      <i
+                        className="fa-solid fa-hashtag text-[14px] text-gray-400"
+                        aria-hidden
+                      />
+                      <div className="flex-1 min-w-0">
+                        <div className="font-medium text-gray-900 truncate">
+                          {p.Number}
+                        </div>
+                        <div className="text-xs text-gray-500 truncate">
+                          {p.Name}{' '}
+                          <span className="text-[11px] text-gray-400">
+                            · {p.CatalogName}
+                          </span>
+                        </div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
 
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-5 w-full">
             {productsToShow.map((product) => (

@@ -62,6 +62,7 @@ interface SearchResultPayload {
 
 export default function HeaderClient({ session }: HeaderClientProps) {
   const router = useRouter();
+
   const [searchValue, setSearchValue] = useState('');
   const [showSearchDrop, setShowSearchDrop] = useState(false);
   const [searchLoading, setSearchLoading] = useState(false);
