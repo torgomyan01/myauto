@@ -3,6 +3,7 @@ import ProductDetails, {
   type ProductData,
 } from '@/components/product/product-details/ProductDetails';
 import RelatedProducts from '@/components/product/related-products/RelatedProducts';
+import { getAutopiterPriceByArticleId } from '@/lib/autopiter';
 
 const getMockProduct = (id: string): ProductData => ({
   id: Number(id),
@@ -31,13 +32,65 @@ const getMockProduct = (id: string): ProductData => ({
   ],
 });
 
+function getDeliveryLabel(deliveryDateRaw: string, isToday: boolean): string {
+  if (isToday) return 'Сегодня';
+  if (!deliveryDateRaw) return 'Уточняйте сроки доставки';
+
+  const parsed = new Date(deliveryDateRaw);
+  if (Number.isNaN(parsed.getTime())) {
+    return `Дата доставки: ${deliveryDateRaw}`;
+  }
+
+  return `Доставка: ${parsed.toLocaleDateString('ru-RU')}`;
+}
+
 export default async function ProductPage({
   params,
 }: {
   params: Promise<{ id: string }>;
 }) {
   const { id } = await params;
-  const product = getMockProduct(id);
+  const articleId = Number(id);
+  let product: ProductData = getMockProduct(id);
+
+  if (Number.isFinite(articleId) && articleId > 0) {
+    const prices = await getAutopiterPriceByArticleId(articleId);
+    const first = prices[0];
+
+    if (first) {
+      const stock = first.NumberOfAvailable && first.NumberOfAvailable > 0
+        ? first.NumberOfAvailable
+        : 1;
+      const sku = first.Number || String(articleId);
+      const name =
+        first.Name?.trim() || `${first.CatalogName || 'Autopiter'} ${sku}`.trim();
+
+      product = {
+        id: articleId,
+        sku,
+        name,
+        price: Number.isFinite(first.SalePrice) ? first.SalePrice : 0,
+        stock,
+        deliveryLabel: getDeliveryLabel(first.DeliveryDate, first.IsToday),
+        images: ['product-img.png'],
+        specs: [
+          { label: 'Каталог', value: first.CatalogName || '—' },
+          { label: 'Артикул', value: first.Number || '—', bold: true },
+          { label: 'Поставщик ID', value: String(first.SellerId) },
+          { label: 'Регион', value: first.Region || '—' },
+          {
+            label: 'Рейтинг продаж',
+            value:
+              first.SalesRating != null ? String(first.SalesRating) : '—',
+          },
+          {
+            label: 'Статус поставщика',
+            value: first.NameStatus || '—',
+          },
+        ],
+      };
+    }
+  }
 
   return (
     <MainTemplate>

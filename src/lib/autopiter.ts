@@ -188,6 +188,130 @@ export interface AutopiterCatalogItem {
   SalesRating: number;
 }
 
+export interface AutopiterPriceItem {
+  DetailUid: string;
+  SellerId: number;
+  Number: string;
+  ShotNumber: string;
+  CatalogName: string;
+  Name: string;
+  NumberOfAvailable: number | null;
+  NumberChange: string;
+  MinNumberOfSales: number | null;
+  SalePrice: number;
+  NumberOfDaysSupply: number | null;
+  DeliveryDate: string;
+  IsDimension: boolean;
+  Region: string;
+  RealTimeInProc: number | null;
+  SuccessfulOrdersProcent: number | null;
+  TypeRefusal: number | null;
+  IsExpress: boolean;
+  IsSearchNum: boolean;
+  SalesRating: number | null;
+  NameStatus: string;
+  StoreType: number | null;
+  IsToday: boolean;
+  CurrencyName: string;
+  IsReliableSupplier: boolean;
+}
+
+function toNumberOrNull(value: unknown): number | null {
+  if (value == null || value === '') return null;
+  const n = Number(value);
+  return Number.isFinite(n) ? n : null;
+}
+
+function toBoolean(value: unknown): boolean {
+  if (typeof value === 'boolean') return value;
+  if (typeof value === 'number') return value !== 0;
+  if (typeof value === 'string') {
+    const normalized = value.trim().toLowerCase();
+    return normalized === 'true' || normalized === '1';
+  }
+  return false;
+}
+
+function extractPriceModelsFromNode(node: unknown): Record<string, unknown>[] {
+  const collected: Record<string, unknown>[] = [];
+
+  const walk = (value: unknown) => {
+    if (value == null) return;
+
+    if (typeof value === 'string') {
+      const trimmed = decodeXmlEntities(value).trim();
+      if (!trimmed) return;
+      if (trimmed.startsWith('<')) {
+        try {
+          walk(parser.parse(trimmed));
+        } catch (e) {
+          // eslint-disable-next-line no-console
+          console.error('[Autopiter] Failed to parse nested price XML', e);
+        }
+      }
+      return;
+    }
+
+    if (Array.isArray(value)) {
+      value.forEach((v) => walk(v));
+      return;
+    }
+
+    if (typeof value !== 'object') return;
+
+    const obj = value as Record<string, unknown>;
+
+    const textValue = obj['#text'];
+    if (
+      typeof textValue === 'string' &&
+      decodeXmlEntities(textValue).trim().startsWith('<')
+    ) {
+      try {
+        walk(parser.parse(decodeXmlEntities(textValue)));
+      } catch (e) {
+        // eslint-disable-next-line no-console
+        console.error('[Autopiter] Failed to parse #text price XML', e);
+      }
+    }
+
+    for (const [key, child] of Object.entries(obj)) {
+      const lower = key.toLowerCase();
+
+      if (
+        lower.includes('pricesearchmodel') ||
+        lower.includes('basepriceforclient')
+      ) {
+        if (Array.isArray(child)) {
+          child.forEach((item) => {
+            if (item && typeof item === 'object') {
+              collected.push(item as Record<string, unknown>);
+            }
+          });
+        } else if (child && typeof child === 'object') {
+          collected.push(child as Record<string, unknown>);
+        }
+      }
+
+      if (
+        lower.includes('dataset') ||
+        lower.includes('diffgram') ||
+        lower.includes('newdataset') ||
+        lower === 'table'
+      ) {
+        walk(child);
+        continue;
+      }
+
+      if (child && typeof child === 'object') {
+        walk(child);
+      }
+    }
+  };
+
+  walk(node);
+  return collected;
+}
+
 function extractModelsFromNode(node: unknown): AutopiterCatalogItem[] {
   const collected: AutopiterCatalogItem[] = [];
 
@@ -271,22 +395,19 @@ function extractModelsFromNode(node: unknown): AutopiterCatalogItem[] {
   return collected;
 }
 
-export async function searchAutopiterByNumber(
-  number: string
-): Promise<AutopiterCatalogItem[]> {
-  if (!number.trim()) return [];
-
+async function findCatalogByQuery(query: string): Promise<AutopiterCatalogItem[]> {
   const cookie = await authorize();
+  const isNameLikeQuery =
+    /[А-Яа-яЁё]/.test(query) || (!/\d/.test(query) && query.trim().length > 2);
 
-  console.log(number);
+  if (isNameLikeQuery) {
+    // eslint-disable-next-line no-console
+    console.log('[Autopiter][FindCatalog][NAME_QUERY] request', { query });
+  }
 
-  // FindCatalog по спецификации (см. https://service.autopiter.ru/v2/price?op=FindCatalog):
-  // единственный входной параметр — <Number>. Если в тексте есть русские слова,
-  // сервис сам делает полнотекстовый поиск по названию.
-  const raw = number.trim();
   const body = `
 <FindCatalog xmlns="http://www.autopiter.ru/">
-  <Number>${escapeXml(raw)}</Number>
+  <Number>${escapeXml(query)}</Number>
 </FindCatalog>`;
 
   const { xml } = await callAutopiterSoap(
@@ -294,6 +415,7 @@ export async function searchAutopiterByNumber(
     cookie,
     'http://www.autopiter.ru/FindCatalog'
   );
+
 
   try {
     const doc = parser.parse(xml);
@@ -339,6 +461,14 @@ export async function searchAutopiterByNumber(
             'SearchCatalog' in value)
       );
 
+    // eslint-disable-next-line no-console
+    console.log('[Autopiter][FindCatalog][PARSED_RESPONSE_NODE]', {
+      query,
+      responseNode,
+    });
+
+      
+
     if (!responseNode) {
       // eslint-disable-next-line no-console
       console.error(
@@ -365,24 +495,233 @@ export async function searchAutopiterByNumber(
     // 1) Пытаемся достать модели из самого FindCatalogResult
     // 2) Если пусто — делаем общий проход по всему SOAP документу
     let itemsArray = extractModelsFromNode(resultNode);
+
+
+
     if (itemsArray.length === 0) {
       itemsArray = extractModelsFromNode(doc);
     }
     if (itemsArray.length === 0) {
+      if (isNameLikeQuery) {
+        // eslint-disable-next-line no-console
+        console.log('[Autopiter][FindCatalog][NAME_QUERY] empty', {
+          query,
+          responseNode,
+          xmlPreview: xml.slice(0, 700),
+        });
+      }
       return [];
     }
 
     // Жёстко маппим к форме SearchCatalogModel:
-    return itemsArray.map((item: any) => ({
+    const mapped = itemsArray.map((item: any) => ({
       ArticleId: Number(item.ArticleId),
       CatalogName: String(item.CatalogName ?? ''),
       Name: String(item.Name ?? ''),
       Number: item.Number,
       SalesRating: Number(item.SalesRating ?? 0),
     }));
+
+    if (isNameLikeQuery) {
+      // eslint-disable-next-line no-console
+      console.log('[Autopiter][FindCatalog][NAME_QUERY] success', {
+        query,
+        total: mapped.length,
+        sample: mapped.slice(0, 5),
+      });
+    }
+
+    return mapped;
   } catch (e) {
     // eslint-disable-next-line no-console
     console.error('[Autopiter] Failed to parse FindCatalog response', e);
+    return [];
+  }
+}
+
+function normalizeForArticleSearch(query: string): string {
+  return query.replace(/[\s\-_.\\/]/g, '').toUpperCase();
+}
+
+function buildFindCatalogCandidates(query: string): string[] {
+  const raw = query.trim();
+  if (!raw) return [];
+
+
+  const collapsedSpaces = raw.replace(/\s+/g, ' ').trim();
+  const normalized = normalizeForArticleSearch(raw);
+  const hasCyrillic = /[А-Яа-яЁё]/.test(raw);
+  const hasDigits = /\d/.test(raw);
+  const hasLatin = /[A-Za-z]/.test(raw);
+  const looksLikeArticle = !hasCyrillic && (hasDigits || hasLatin);
+
+  const candidates = new Set<string>();
+  candidates.add(raw);
+
+  if (collapsedSpaces !== raw) {
+    candidates.add(collapsedSpaces);
+  }
+
+  // Для номера детали пробуем также "склеенный" вариант без разделителей.
+  if (looksLikeArticle && normalized && normalized !== raw) {
+    candidates.add(normalized);
+  }
+
+  return Array.from(candidates);
+}
+
+function dedupeCatalogItems(
+  items: AutopiterCatalogItem[]
+): AutopiterCatalogItem[] {
+  const seen = new Set<string>();
+  const unique: AutopiterCatalogItem[] = [];
+
+  for (const item of items) {
+    const key = `${item.ArticleId}::${String(item.Number)}::${item.CatalogName}`;
+    if (seen.has(key)) continue;
+    seen.add(key);
+    unique.push(item);
+  }
+
+  return unique;
+}
+
+export async function searchAutopiter(
+  query: string
+): Promise<AutopiterCatalogItem[]> {
+  const candidates = buildFindCatalogCandidates(query);
+  if (candidates.length === 0) return [];
+
+  const isNameLikeQuery =
+    /[А-Яа-яЁё]/.test(query) || (!/\d/.test(query) && query.trim().length > 2);
+  if (isNameLikeQuery) {
+    // eslint-disable-next-line no-console
+    console.log('[Autopiter][Search][NAME_QUERY] candidates', {
+      query,
+      candidates,
+    });
+  }
+
+  const settled = await Promise.allSettled(
+    candidates.map((candidate) => findCatalogByQuery(candidate))
+  );
+
+  const merged: AutopiterCatalogItem[] = [];
+  for (const result of settled) {
+    if (result.status === 'fulfilled') {
+      merged.push(...result.value);
+    } else {
+      // eslint-disable-next-line no-console
+      console.error('[Autopiter] FindCatalog candidate search failed', result.reason);
+    }
+  }
+
+  const deduped = dedupeCatalogItems(merged);
+ 
+  return deduped;
+}
+
+export async function searchAutopiterByNumber(
+  number: string
+): Promise<AutopiterCatalogItem[]> {
+  // Оставлено для обратной совместимости импорта в текущих местах.
+  return searchAutopiter(number);
+}
+
+export async function getAutopiterPriceByArticleId(
+  articleId: number
+): Promise<AutopiterPriceItem[]> {
+  if (!Number.isFinite(articleId) || articleId <= 0) return [];
+
+  const cookie = await authorize();
+
+  const body = `
+<GetPriceId xmlns="http://www.autopiter.ru/">
+  <ArticleId>${articleId}</ArticleId>
+</GetPriceId>`;
+
+  const { xml } = await callAutopiterSoap(
+    body,
+    cookie,
+    'http://www.autopiter.ru/GetPriceId'
+  );
+
+  try {
+    const doc = parser.parse(xml);
+
+    const envelope =
+      doc['soap:Envelope'] ??
+      doc['Envelope'] ??
+      doc['soapenv:Envelope'] ??
+      doc['S:Envelope'] ??
+      doc['s:Envelope'] ??
+      doc.Envelope;
+
+    const responseBody =
+      envelope?.['soap:Body'] ??
+      envelope?.['Body'] ??
+      envelope?.['soapenv:Body'] ??
+      envelope?.['S:Body'] ??
+      envelope?.['s:Body'] ??
+      envelope?.Body ??
+      null;
+
+    if (!responseBody) return [];
+
+    const responseNode =
+      (responseBody as Record<string, unknown>)['GetPriceIdResponse'] ??
+      Object.values(responseBody as Record<string, unknown>).find(
+        (value: unknown) =>
+          Boolean(value) &&
+          typeof value === 'object' &&
+          ('GetPriceIdResult' in (value as Record<string, unknown>) ||
+            'PriceSearchModel' in (value as Record<string, unknown>) ||
+            'BasePriceForClient' in (value as Record<string, unknown>))
+      );
+
+    if (!responseNode || typeof responseNode !== 'object') return [];
+
+    const resultNode =
+      (responseNode as Record<string, unknown>)['GetPriceIdResult'] ??
+      responseNode;
+
+    let items = extractPriceModelsFromNode(resultNode);
+    if (items.length === 0) {
+      items = extractPriceModelsFromNode(doc);
+    }
+
+    if (items.length === 0) return [];
+
+    return items.map((item) => ({
+      DetailUid: String(item.DetailUid ?? ''),
+      SellerId: Number(item.SellerId ?? -1),
+      Number: String(item.Number ?? ''),
+      ShotNumber: String(item.ShotNumber ?? ''),
+      CatalogName: String(item.CatalogName ?? ''),
+      Name: String(item.Name ?? ''),
+      NumberOfAvailable: toNumberOrNull(item.NumberOfAvailable),
+      NumberChange: String(item.NumberChange ?? ''),
+      MinNumberOfSales: toNumberOrNull(item.MinNumberOfSales),
+      SalePrice: Number(item.SalePrice ?? 0),
+      NumberOfDaysSupply: toNumberOrNull(item.NumberOfDaysSupply),
+      DeliveryDate: String(item.DeliveryDate ?? ''),
+      IsDimension: toBoolean(item.IsDimension),
+      Region: String(item.Region ?? ''),
+      RealTimeInProc: toNumberOrNull(item.RealTimeInProc),
+      SuccessfulOrdersProcent: toNumberOrNull(item.SuccessfulOrdersProcent),
+      TypeRefusal: toNumberOrNull(item.TypeRefusal),
+      IsExpress: toBoolean(item.IsExpress),
+      IsSearchNum: toBoolean(item.IsSearchNum),
+      SalesRating: toNumberOrNull(item.SalesRating),
+      NameStatus: String(item.NameStatus ?? ''),
+      StoreType: toNumberOrNull(item.StoreType),
+      IsToday: toBoolean(item.IsToday),
+      CurrencyName: String(item.CurrencyName ?? 'RUB'),
+      IsReliableSupplier: toBoolean(item.IsReliableSupplier),
+    }));
+  } catch (e) {
+    // eslint-disable-next-line no-console
+    console.error('[Autopiter] Failed to parse GetPriceId response', e);
     return [];
   }
 }

@@ -20,6 +20,7 @@ import {
   searchAutopiterByNumber,
   type AutopiterCatalogItem,
 } from '@/lib/autopiter';
+import ProductCard from '@/components/product/product-card/ProductCard';
 
 const BRANDS = ['Ravenol', 'Mobil', 'Toyota', 'Shell', 'Honda', 'Comma'];
 const VISCOSITIES = ['0W-20', '0W-40', '5W-30', '10W-30', '15W-40', '0W-30'];
@@ -43,13 +44,14 @@ export default function SearchPage() {
   const [autopiterParts, setAutopiterParts] = useState<AutopiterCatalogItem[]>(
     []
   );
+
+  
   const [searchLoading, setSearchLoading] = useState(false);
   const [searchError, setSearchError] = useState<string | null>(null);
   const [addGarageLoadingId, setAddGarageLoadingId] = useState<string | null>(
     null
   );
   const [addGarageMessage, setAddGarageMessage] = useState<string | null>(null);
-
   const searchParams = useSearchParams();
   const query = searchParams.get('q') ?? '';
 
@@ -522,30 +524,18 @@ export default function SearchPage() {
                 <h2 className="mb-2 text-sm font-semibold text-gray-800">
                   Результаты партнёрского сервиса Autopiter
                 </h2>
-                <div className="max-h-60 overflow-y-auto rounded-2xl border border-gray-100 bg-white/80 p-3 shadow-sm space-y-1.5">
-                  {autopiterParts.slice(0, 50).map((p) => (
-                    <div
-                      key={`${p.ArticleId}-${p.CatalogName}-${p.Number}`}
-                      className="flex items-center gap-3 rounded-xl px-3 py-2 text-sm hover:bg-gray-50 transition-colors"
-                    >
-                      <i
-                        className="fa-solid fa-hashtag text-[14px] text-gray-400"
-                        aria-hidden
+                  <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
+                    {autopiterParts.slice(0, 50).map((p) => (
+                      <ProductCard
+                        key={`${p.ArticleId}-${p.CatalogName}-${p.Number}`}
+                        id={p.ArticleId}
+                        number={String(p.Number)}
+                        name={p.Name}
+                        catalogName={p.CatalogName}
+                        salesRating={p.SalesRating}
                       />
-                      <div className="flex-1 min-w-0">
-                        <div className="font-medium text-gray-900 truncate">
-                          {p.Number}
-                        </div>
-                        <div className="text-xs text-gray-500 truncate">
-                          {p.Name}{' '}
-                          <span className="text-[11px] text-gray-400">
-                            · {p.CatalogName}
-                          </span>
-                        </div>
-                      </div>
-                    </div>
-                  ))}
-                </div>
+                    ))}
+                  </div>
               </div>
             )}
 
