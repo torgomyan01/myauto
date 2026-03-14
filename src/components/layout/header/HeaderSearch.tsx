@@ -413,6 +413,12 @@ export function HeaderSearch() {
                       <div
                         key={`${p.ArticleId}-${p.CatalogName}-${p.Number}`}
                         className={styles.infoLine}
+                        role="button"
+                        onClick={() => {
+                          setShowSearchDrop(false);
+                          router.push(ROUTES.PRODUCT(p.ArticleId));
+                        }}
+                        style={{ cursor: 'pointer' }}
                       >
                         <i
                           className="fa-solid fa-hashtag text-[14px]"

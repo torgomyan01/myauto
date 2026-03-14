@@ -1,8 +1,6 @@
 'use client';
 
 import { useEffect, useMemo, useState } from 'react';
-import Image from 'next/image';
-import Link from 'next/link';
 import { useRouter, useSearchParams } from 'next/navigation';
 import MainTemplate from '@/components/layout/main-template/MainTemplate';
 import AddToCartModal, {
@@ -45,7 +43,6 @@ export default function SearchPage() {
     []
   );
 
-  
   const [searchLoading, setSearchLoading] = useState(false);
   const [searchError, setSearchError] = useState<string | null>(null);
   const [addGarageLoadingId, setAddGarageLoadingId] = useState<string | null>(
@@ -104,7 +101,7 @@ export default function SearchPage() {
       setSearchParts([]);
       setSearchCars([]);
       setSearchKind('name');
-       setAutopiterParts([]);
+      setAutopiterParts([]);
       setSearchError(null);
       setSearchLoading(false);
       return;
@@ -163,6 +160,38 @@ export default function SearchPage() {
     }));
   }, [searchParts]);
 
+  const sortedAutopiterParts = useMemo(() => {
+    if (autopiterParts.length === 0) return [];
+
+    const getNameCompletenessScore = (name: string): number => {
+      const trimmed = String(name ?? '').trim();
+      if (!trimmed || trimmed === '-' || trimmed === '—') return 0;
+
+      let score = 0;
+      if (trimmed.length >= 20) score += 3;
+      else if (trimmed.length >= 10) score += 2;
+      else if (trimmed.length >= 4) score += 1;
+
+      if (/\s/.test(trimmed)) score += 1;
+      if (/[A-Za-zА-Яа-яЁё]/.test(trimmed)) score += 1;
+
+      return score;
+    };
+
+    return [...autopiterParts].sort((a, b) => {
+      const ratingDiff = (b.SalesRating ?? 0) - (a.SalesRating ?? 0);
+      if (ratingDiff !== 0) return ratingDiff;
+
+      const nameScoreDiff =
+        getNameCompletenessScore(b.Name) - getNameCompletenessScore(a.Name);
+      if (nameScoreDiff !== 0) return nameScoreDiff;
+
+      return String(a.Name ?? '').localeCompare(String(b.Name ?? ''), 'ru', {
+        sensitivity: 'base',
+      });
+    });
+  }, [autopiterParts]);
+
   const handleAddToGarage = async (car: SearchCarResult) => {
     if (!car.vin) {
       setAddGarageMessage('Для этого автомобиля VIN не найден.');
@@ -182,6 +211,12 @@ export default function SearchPage() {
     } finally {
       setAddGarageLoadingId(null);
     }
+  };
+
+  const handleAddLocalProductToCart = (id: number) => {
+    const product = productsToShow.find((p) => p.id === id);
+    if (!product) return;
+    openModal(product);
   };
 
   const Filters = ({ isMobile = false }: { isMobile?: boolean }) => (
@@ -522,84 +557,116 @@ export default function SearchPage() {
             autopiterParts.length > 0 && (
               <div className="mb-6">
                 <h2 className="mb-2 text-sm font-semibold text-gray-800">
-                  Результаты партнёрского сервиса Autopiter
+                  Результаты партнёрского сервиса
                 </h2>
-                  <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
-                    {autopiterParts.slice(0, 50).map((p) => (
-                      <ProductCard
-                        key={`${p.ArticleId}-${p.CatalogName}-${p.Number}`}
-                        id={p.ArticleId}
-                        number={String(p.Number)}
-                        name={p.Name}
-                        catalogName={p.CatalogName}
-                        salesRating={p.SalesRating}
-                      />
-                    ))}
-                  </div>
+                <div className="overflow-x-auto rounded-2xl border border-gray-100 bg-white shadow-sm">
+                  <table className="min-w-full text-left text-sm">
+                    <thead className="bg-gray-50 text-xs uppercase tracking-wide text-gray-500">
+                      <tr>
+                        <th className="px-3 py-2">Номер</th>
+                        <th className="px-3 py-2">Наименование</th>
+                        <th className="px-3 py-2">Каталог</th>
+                        <th className="px-3 py-2">Рейтинг</th>
+                        <th className="px-3 py-2">Действие</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {sortedAutopiterParts.slice(0, 50).map((p) => (
+                        <tr
+                          key={`${p.ArticleId}-${p.CatalogName}-${p.Number}`}
+                          className="border-t border-gray-100 hover:bg-gray-50/60"
+                        >
+                          <td className="px-3 py-2 font-medium text-gray-900">
+                            {p.Number}
+                          </td>
+                          <td className="px-3 py-2 text-gray-700">{p.Name}</td>
+                          <td className="px-3 py-2 text-gray-500">
+                            {p.CatalogName}
+                          </td>
+                          <td className="px-3 py-2 text-gray-500">
+                            {p.SalesRating ?? 0}
+                          </td>
+                          <td className="px-3 py-2">
+                            <div className="flex items-center gap-1.5">
+                              <button
+                                type="button"
+                                onClick={() =>
+                                  toggleFavorite(p.ArticleId)
+                                }
+                                className="inline-flex h-7 w-7 items-center justify-center rounded-md border border-gray-200 text-xs hover:bg-gray-50"
+                                aria-label="В избранное"
+                                title="В избранное"
+                              >
+                                <i
+                                  className={
+                                    favorites.includes(p.ArticleId)
+                                      ? 'fa-solid fa-heart text-[#E21321]'
+                                      : 'fa-regular fa-heart text-gray-500'
+                                  }
+                                  aria-hidden
+                                />
+                              </button>
+                              <button
+                                type="button"
+                                onClick={() =>
+                                  router.push(
+                                    `${ROUTES.CART}?autopiterArticleId=${encodeURIComponent(
+                                      String(p.ArticleId)
+                                    )}`
+                                  )
+                                }
+                                className="inline-flex h-7 w-7 items-center justify-center rounded-md border border-gray-200 text-xs hover:bg-gray-50"
+                                aria-label="Добавить в корзину"
+                                title="Добавить в корзину"
+                              >
+                                <i
+                                  className="fa-solid fa-cart-shopping text-gray-600"
+                                  aria-hidden
+                                />
+                              </button>
+                              <button
+                                type="button"
+                                onClick={() =>
+                                  router.push(
+                                    ROUTES.AUTOPITER_PRODUCT(p.ArticleId)
+                                  )
+                                }
+                                className="rounded-md border border-gray-200 px-2.5 py-1 text-xs font-medium text-gray-700 hover:bg-gray-50"
+                              >
+                                Открыть
+                              </button>
+                            </div>
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
               </div>
             )}
 
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-5 w-full">
-            {productsToShow.map((product) => (
-              <div
-                key={product.id}
-                className="relative flex flex-col rounded-xl bg-white p-3 shadow-sm hover:shadow-md transition-shadow"
-              >
-                <span className="absolute top-2 left-2 inline-flex items-center justify-center px-2 py-1 rounded-full bg-red-600 text-white text-[11px] font-semibold z-10">
-                  -20%
-                </span>
-
-                <button
-                  type="button"
-                  onClick={() => toggleFavorite(product.id)}
-                  className="absolute top-2 right-2 w-9 h-9 rounded-full bg-white/80 shadow flex items-center justify-center z-10 hover:scale-105 transition-transform"
-                >
-                  <i
-                    className={
-                      favorites.includes(product.id)
-                        ? 'fa-solid fa-heart text-[#E21321] text-sm'
-                        : 'fa-regular fa-heart text-gray-400 text-sm'
-                    }
+          {productsToShow.length > 0 && (
+            <div className="mb-6">
+              <h2 className="mb-2 text-sm font-semibold text-gray-800">
+                Товары нашего магазина
+              </h2>
+              <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
+                {productsToShow.map((product) => (
+                  <ProductCard
+                    key={product.id}
+                    id={product.id}
+                    number={product.description ?? product.name}
+                    name={product.name}
+                    price={product.price > 0 ? product.price : undefined}
+                    imageSrc={product.img}
+                    isFavorite={favorites.includes(product.id)}
+                    onToggleFavorite={toggleFavorite}
+                    onAddToCart={handleAddLocalProductToCart}
                   />
-                </button>
-
-                <Link
-                  href={ROUTES.PRODUCT(product.id)}
-                  className="flex p-2 mb-2 min-h-[140px] items-center justify-center"
-                >
-                  <Image
-                    src={`/img/${product.img}`}
-                    alt={product.name}
-                    width={200}
-                    height={200}
-                    className="w-full object-contain"
-                  />
-                </Link>
-
-                <Link
-                  href={ROUTES.PRODUCT(product.id)}
-                  className="text-sm font-medium text-gray-900 mb-1 hover:text-[#E21321] transition-colors"
-                >
-                  {product.name}
-                </Link>
-
-                {product.price > 0 && (
-                  <span className="text-lg font-semibold text-gray-900">
-                    {product.price.toLocaleString('ru-RU')} AMD
-                  </span>
-                )}
-
-                <button
-                  type="button"
-                  onClick={() => openModal(product)}
-                  className="mt-3 h-11 w-full rounded-xl bg-[#E21321] text-white text-sm font-semibold flex items-center justify-center gap-2 hover:bg-[#c41020] transition-colors"
-                >
-                  <i className="fa-solid fa-cart-shopping" />
-                  Добавить в корзину
-                </button>
+                ))}
               </div>
-            ))}
-          </div>
+            </div>
+          )}
         </section>
 
         <AddToCartModal

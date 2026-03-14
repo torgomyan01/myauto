@@ -89,3 +89,16 @@ model GarageCar {
 
   @@unique([userId, vin], map: "GarageCar_user_vin_key")
 }
+
+model SpareCategory {
+  id        Int      @id @default(autoincrement())
+  label     String   @unique @db.VarChar(191)
+  href      String   @db.VarChar(512)
+  image     String   @db.VarChar(512)
+  sortOrder Int      @default(0)
+  isActive  Boolean  @default(true)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([isActive, sortOrder])
+}

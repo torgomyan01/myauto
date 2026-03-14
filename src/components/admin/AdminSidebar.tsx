@@ -22,6 +22,11 @@ const menuItems = [
     icon: 'fa-clipboard-check',
   },
   {
+    label: 'Добавить запчасть',
+    href: ROUTES.ADMIN_PARTS_ADD,
+    icon: 'fa-plus',
+  },
+  {
     label: 'Настройки',
     icon: 'fa-gear',
     children: [

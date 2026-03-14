@@ -4,6 +4,8 @@ export const ROUTES = {
   REGISTER: '/auth/register',
   FORGOT_PASSWORD: '/auth/forgot-password',
   PRODUCT: (id: number | string) => `/product/${id}`,
+  AUTOPITER_PRODUCT: (articleId: number | string) =>
+    `/autopiter/product/${articleId}`,
   CART: '/cart',
   PROFILE: '/profile',
   GARAGE: '/profile/garage',
@@ -15,6 +17,7 @@ export const ROUTES = {
   BRAND_MODEL_GROUPS: '/brands/model/groups',
   BRAND_MODEL_PARTS: '/brands/model/groups/parts',
   ADMIN: '/admin',
+  ADMIN_PARTS_ADD: '/admin/parts/add',
   ADMIN_USERS: '/admin/users',
   ADMIN_SETTINGS: '/admin/settings',
   ADD_CAR: '/add/car',

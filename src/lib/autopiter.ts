@@ -395,15 +395,12 @@ function extractModelsFromNode(node: unknown): AutopiterCatalogItem[] {
   return collected;
 }
 
-async function findCatalogByQuery(query: string): Promise<AutopiterCatalogItem[]> {
+async function findCatalogByQuery(
+  query: string
+): Promise<AutopiterCatalogItem[]> {
   const cookie = await authorize();
   const isNameLikeQuery =
     /[А-Яа-яЁё]/.test(query) || (!/\d/.test(query) && query.trim().length > 2);
-
-  if (isNameLikeQuery) {
-    // eslint-disable-next-line no-console
-    console.log('[Autopiter][FindCatalog][NAME_QUERY] request', { query });
-  }
 
   const body = `
 <FindCatalog xmlns="http://www.autopiter.ru/">
@@ -415,7 +412,6 @@ async function findCatalogByQuery(query: string): Promise<AutopiterCatalogItem[]
     cookie,
     'http://www.autopiter.ru/FindCatalog'
   );
-
 
   try {
     const doc = parser.parse(xml);
@@ -461,14 +457,6 @@ async function findCatalogByQuery(query: string): Promise<AutopiterCatalogItem[]
             'SearchCatalog' in value)
       );
 
-    // eslint-disable-next-line no-console
-    console.log('[Autopiter][FindCatalog][PARSED_RESPONSE_NODE]', {
-      query,
-      responseNode,
-    });
-
-      
-
     if (!responseNode) {
       // eslint-disable-next-line no-console
       console.error(
@@ -496,8 +484,6 @@ async function findCatalogByQuery(query: string): Promise<AutopiterCatalogItem[]
     // 2) Если пусто — делаем общий проход по всему SOAP документу
     let itemsArray = extractModelsFromNode(resultNode);
 
-
-
     if (itemsArray.length === 0) {
       itemsArray = extractModelsFromNode(doc);
     }
@@ -506,8 +492,11 @@ async function findCatalogByQuery(query: string): Promise<AutopiterCatalogItem[]
         // eslint-disable-next-line no-console
         console.log('[Autopiter][FindCatalog][NAME_QUERY] empty', {
           query,
-          responseNode,
-          xmlPreview: xml.slice(0, 700),
+          responseNodeKeys:
+            responseNode && typeof responseNode === 'object'
+              ? Object.keys(responseNode as Record<string, unknown>)
+              : [],
+          xmlPreview: xml.slice(0, 220),
         });
       }
       return [];
@@ -527,7 +516,7 @@ async function findCatalogByQuery(query: string): Promise<AutopiterCatalogItem[]
       console.log('[Autopiter][FindCatalog][NAME_QUERY] success', {
         query,
         total: mapped.length,
-        sample: mapped.slice(0, 5),
+        sample: mapped.slice(0, 2),
       });
     }
 
@@ -547,13 +536,13 @@ function buildFindCatalogCandidates(query: string): string[] {
   const raw = query.trim();
   if (!raw) return [];
 
-
   const collapsedSpaces = raw.replace(/\s+/g, ' ').trim();
   const normalized = normalizeForArticleSearch(raw);
   const hasCyrillic = /[А-Яа-яЁё]/.test(raw);
   const hasDigits = /\d/.test(raw);
   const hasLatin = /[A-Za-z]/.test(raw);
   const looksLikeArticle = !hasCyrillic && (hasDigits || hasLatin);
+  const isNameLike = !looksLikeArticle;
 
   const candidates = new Set<string>();
   candidates.add(raw);
@@ -565,6 +554,21 @@ function buildFindCatalogCandidates(query: string): string[] {
   // Для номера детали пробуем также "склеенный" вариант без разделителей.
   if (looksLikeArticle && normalized && normalized !== raw) {
     candidates.add(normalized);
+  }
+
+  // Для текстового поиска пробуем разные формы строки.
+  if (isNameLike) {
+    candidates.add(collapsedSpaces.toUpperCase());
+    candidates.add(collapsedSpaces.toLowerCase());
+    candidates.add(collapsedSpaces.replace(/ё/g, 'е').replace(/Ё/g, 'Е'));
+
+    if (collapsedSpaces.includes(' ')) {
+      const words = collapsedSpaces
+        .split(' ')
+        .map((w) => w.trim())
+        .filter((w) => w.length >= 3);
+      words.forEach((w) => candidates.add(w));
+    }
   }
 
   return Array.from(candidates);
@@ -612,12 +616,15 @@ export async function searchAutopiter(
       merged.push(...result.value);
     } else {
       // eslint-disable-next-line no-console
-      console.error('[Autopiter] FindCatalog candidate search failed', result.reason);
+      console.error(
+        '[Autopiter] FindCatalog candidate search failed',
+        result.reason
+      );
     }
   }
 
   const deduped = dedupeCatalogItems(merged);
- 
+
   return deduped;
 }
 

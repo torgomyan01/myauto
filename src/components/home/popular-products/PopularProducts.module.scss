@@ -117,6 +117,10 @@
   margin-bottom: 5px;
   color: #000;
   transition: 0.3s;
+  height: 30px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 
   &:hover {
     color: #e21321;
