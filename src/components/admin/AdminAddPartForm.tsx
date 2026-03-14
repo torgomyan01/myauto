@@ -6,6 +6,7 @@ import {
   getAcatModifications,
   getAcatModels,
 } from '@/app/actions/acat';
+import { prefillPartFromAutopiterByOem } from '@/app/actions/autopiter';
 import {
   Autocomplete,
   AutocompleteItem,
@@ -40,6 +41,38 @@ type CategoryOption = { id: number; label: string };
 type AcatMarkOption = { id: string; name: string; typeId: string };
 type AcatModelOption = { id: string; name: string };
 type AcatModificationOption = { id: string; name: string };
+type CountryType = { code: string; label: string; suggested?: boolean };
+
+const COUNTRY_CODES = [
+  'AD', 'AE', 'AF', 'AG', 'AI', 'AL', 'AM', 'AO', 'AQ', 'AR', 'AS', 'AT', 'AU',
+  'AW', 'AX', 'AZ', 'BA', 'BB', 'BD', 'BE', 'BF', 'BG', 'BH', 'BI', 'BJ', 'BL',
+  'BM', 'BN', 'BO', 'BR', 'BS', 'BT', 'BV', 'BW', 'BY', 'BZ', 'CA', 'CC', 'CD',
+  'CF', 'CG', 'CH', 'CI', 'CK', 'CL', 'CM', 'CN', 'CO', 'CR', 'CU', 'CV', 'CW',
+  'CX', 'CY', 'CZ', 'DE', 'DJ', 'DK', 'DM', 'DO', 'DZ', 'EC', 'EE', 'EG', 'EH',
+  'ER', 'ES', 'ET', 'FI', 'FJ', 'FK', 'FM', 'FO', 'FR', 'GA', 'GB', 'GD', 'GE',
+  'GF', 'GG', 'GH', 'GI', 'GL', 'GM', 'GN', 'GP', 'GQ', 'GR', 'GS', 'GT', 'GU',
+  'GW', 'GY', 'HK', 'HM', 'HN', 'HR', 'HT', 'HU', 'ID', 'IE', 'IL', 'IM', 'IN',
+  'IO', 'IQ', 'IR', 'IS', 'IT', 'JE', 'JM', 'JO', 'JP', 'KE', 'KG', 'KH', 'KI',
+  'KM', 'KN', 'KP', 'KR', 'KW', 'KY', 'KZ', 'LA', 'LB', 'LC', 'LI', 'LK', 'LR',
+  'LS', 'LT', 'LU', 'LV', 'LY', 'MA', 'MC', 'MD', 'ME', 'MF', 'MG', 'MH', 'MK',
+  'ML', 'MM', 'MN', 'MO', 'MP', 'MQ', 'MR', 'MS', 'MT', 'MU', 'MV', 'MW', 'MX',
+  'MY', 'MZ', 'NA', 'NC', 'NE', 'NF', 'NG', 'NI', 'NL', 'NO', 'NP', 'NR', 'NU',
+  'NZ', 'OM', 'PA', 'PE', 'PF', 'PG', 'PH', 'PK', 'PL', 'PM', 'PN', 'PR', 'PS',
+  'PT', 'PW', 'PY', 'QA', 'RE', 'RO', 'RS', 'RU', 'RW', 'SA', 'SB', 'SC', 'SD',
+  'SE', 'SG', 'SH', 'SI', 'SJ', 'SK', 'SL', 'SM', 'SN', 'SO', 'SR', 'SS', 'ST',
+  'SV', 'SX', 'SY', 'SZ', 'TC', 'TD', 'TF', 'TG', 'TH', 'TJ', 'TK', 'TL', 'TM',
+  'TN', 'TO', 'TR', 'TT', 'TV', 'TW', 'TZ', 'UA', 'UG', 'US', 'UY', 'UZ', 'VA',
+  'VC', 'VE', 'VG', 'VI', 'VN', 'VU', 'WF', 'WS', 'XK', 'YE', 'YT', 'ZA', 'ZM',
+  'ZW',
+] as const;
+
+const SUGGESTED_COUNTRY_CODES = new Set(['AU', 'CA', 'DE', 'FR', 'JP', 'US']);
+const regionNames = new Intl.DisplayNames(['ru'], { type: 'region' });
+const countries: readonly CountryType[] = COUNTRY_CODES.map((code) => ({
+  code,
+  label: regionNames.of(code) ?? code,
+  ...(SUGGESTED_COUNTRY_CODES.has(code) ? { suggested: true } : {}),
+}));
 
 function getSingleSelectionKey(selection: unknown): string {
   if (!selection || selection === 'all') return '';
@@ -91,6 +124,7 @@ export default function AdminAddPartForm({ categories }: AdminAddPartFormProps) 
   const [isUniversal, setIsUniversal] = useState(false);
   const [minOrderQty, setMinOrderQty] = useState('1');
   const [tags, setTags] = useState('');
+  const [partCondition, setPartCondition] = useState<'NEW' | 'USED'>('NEW');
 
   const [oemNumbers, setOemNumbers] = useState<OemNumber[]>([{ value: '' }]);
   const [compatibility, setCompatibility] = useState<Compatibility[]>([
@@ -102,6 +136,9 @@ export default function AdminAddPartForm({ categories }: AdminAddPartFormProps) 
 
   const [submitError, setSubmitError] = useState<string | null>(null);
   const [acatError, setAcatError] = useState<string | null>(null);
+  const [oemAutofillError, setOemAutofillError] = useState<string | null>(null);
+  const [oemAutofillLoading, setOemAutofillLoading] = useState(false);
+  const [oemAutofillMessage, setOemAutofillMessage] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
   const [mediaUploading, setMediaUploading] = useState(false);
   const [acatLoadingMarks, setAcatLoadingMarks] = useState(false);
@@ -134,6 +171,7 @@ export default function AdminAddPartForm({ categories }: AdminAddPartFormProps) 
     setIsUniversal(false);
     setMinOrderQty('1');
     setTags('');
+    setPartCondition('NEW');
     setOemNumbers([{ value: '' }]);
     setCompatibility([emptyCompatibility()]);
     setOffers([emptyOffer()]);
@@ -141,6 +179,8 @@ export default function AdminAddPartForm({ categories }: AdminAddPartFormProps) 
     setAttributes([emptyAttribute()]);
     setSubmitError(null);
     setAcatError(null);
+    setOemAutofillError(null);
+    setOemAutofillMessage(null);
     setAcatTypeId('');
     setAcatMarkId('');
     setAcatModelId('');
@@ -180,6 +220,19 @@ export default function AdminAddPartForm({ categories }: AdminAddPartFormProps) 
     () => media.filter((m) => m.url.trim()).length,
     [media]
   );
+  const filteredCountries = useMemo(() => {
+    const q = manufacturerCountry.trim().toLowerCase();
+    const sorted = [...countries].sort((a, b) => {
+      if (!!a.suggested !== !!b.suggested) return a.suggested ? -1 : 1;
+      return a.label.localeCompare(b.label, 'en', { sensitivity: 'base' });
+    });
+    if (!q) return sorted;
+    return sorted.filter(
+      (country) =>
+        country.label.toLowerCase().includes(q) ||
+        country.code.toLowerCase().includes(q)
+    );
+  }, [manufacturerCountry]);
 
   useEffect(() => {
     const categoryLabel = selectedCategoryOption?.label?.toLowerCase() ?? '';
@@ -401,6 +454,7 @@ export default function AdminAddPartForm({ categories }: AdminAddPartFormProps) 
           weightKg: Number(weightKg) || null,
           dimensions: dimensions.trim() || null,
           isUniversal,
+          condition: partCondition,
           minOrderQty: Number(minOrderQty) || 1,
           tags: normalizedTags,
         },
@@ -417,7 +471,7 @@ export default function AdminAddPartForm({ categories }: AdminAddPartFormProps) 
           currency: o.currency,
           stock: Number(o.stock) || 0,
           deliveryDays: Number(o.deliveryDays) || null,
-          condition: o.condition,
+          condition: partCondition,
           isFeatured: o.isFeatured,
         })),
         media: media
@@ -490,8 +544,118 @@ export default function AdminAddPartForm({ categories }: AdminAddPartFormProps) 
     setMedia((prev) => prev.filter((_, i) => i !== idx));
   };
 
+  const handleAutofillFromOem = async () => {
+    const firstOem = oemNumbers.map((o) => o.value.trim()).find(Boolean);
+    if (!firstOem) {
+      setOemAutofillError('Сначала укажите OEM номер в первой строке.');
+      setOemAutofillMessage(null);
+      return;
+    }
+
+    setOemAutofillError(null);
+    setOemAutofillMessage(null);
+    setOemAutofillLoading(true);
+    try {
+      const result = await prefillPartFromAutopiterByOem(firstOem);
+      if (!result.ok || !result.prefill) {
+        setOemAutofillError(result.message ?? 'Не удалось получить данные из Autopiter.');
+        return;
+      }
+
+      const { prefill } = result;
+      setTitle(prefill.title);
+      setBrand(prefill.brand);
+      setArticle(prefill.article);
+      setDescription((prev) => (prev.trim() ? prev : prefill.description));
+
+      setOffers((prev) => {
+        const next = prev.length > 0 ? [...prev] : [emptyOffer()];
+        next[0] = {
+          ...next[0],
+          sellerName: prefill.offer.sellerName,
+          sku: prefill.offer.sku,
+          price: prefill.offer.price,
+          currency: prefill.offer.currency,
+          stock: prefill.offer.stock,
+          deliveryDays: prefill.offer.deliveryDays,
+        };
+        return next;
+      });
+
+      setAttributes((prev) => {
+        const manual = prev.filter((attr) => !attr.key.startsWith('Autopiter:'));
+        const autopiterAttrs = prefill.attributes.map((attr) => ({ ...attr }));
+        return [...manual, ...autopiterAttrs];
+      });
+
+      setOemAutofillMessage('Поля автоматически заполнены из Autopiter.');
+    } catch {
+      setOemAutofillError('Ошибка при обращении к Autopiter. Попробуйте позже.');
+    } finally {
+      setOemAutofillLoading(false);
+    }
+  };
+
   return (
     <form onSubmit={handleSubmit} className="space-y-6">
+      <section className="rounded-xl border border-zinc-200 bg-white p-5 shadow-sm">
+        <div className="mb-3 flex items-center justify-between gap-2">
+          <h2 className="text-base font-semibold text-zinc-800">OEM номера</h2>
+          <div className="flex items-center gap-2">
+            <button
+              type="button"
+              onClick={handleAutofillFromOem}
+              disabled={oemAutofillLoading}
+              className="rounded-md border border-emerald-300 px-2.5 py-1 text-xs font-medium text-emerald-700 hover:bg-emerald-50 disabled:cursor-not-allowed disabled:opacity-60"
+            >
+              {oemAutofillLoading ? 'Загрузка...' : 'Заполнить из Autopiter'}
+            </button>
+            <button
+              type="button"
+              onClick={() => setOemNumbers((prev) => [...prev, { value: '' }])}
+              className="rounded-md border border-zinc-300 px-2.5 py-1 text-xs font-medium text-zinc-700 hover:bg-zinc-50"
+            >
+              + Добавить OEM
+            </button>
+          </div>
+        </div>
+        <div className="space-y-2">
+          {oemNumbers.map((item, idx) => (
+            <div key={`oem-${idx}`} className="flex gap-2">
+              <Input
+                value={item.value}
+                onValueChange={(value) =>
+                  setOemNumbers((prev) =>
+                    prev.map((row, i) =>
+                      i === idx ? { ...row, value } : row
+                    )
+                  )
+                }
+                placeholder="OEM номер"
+                className="w-full"
+              />
+              {oemNumbers.length > 1 && (
+                <button
+                  type="button"
+                  onClick={() =>
+                    setOemNumbers((prev) => prev.filter((_, i) => i !== idx))
+                  }
+                  className="rounded-md border border-zinc-300 px-2 text-xs text-zinc-600 hover:bg-zinc-50"
+                >
+                  Удалить
+                </button>
+              )}
+            </div>
+          ))}
+        </div>
+        {oemAutofillError && (
+          <p className="mt-2 text-sm text-rose-600">{oemAutofillError}</p>
+        )}
+        {oemAutofillMessage && (
+          <p className="mt-2 text-sm text-emerald-600">{oemAutofillMessage}</p>
+        )}
+      </section>
+
       <section className="rounded-xl border border-zinc-200 bg-white p-5 shadow-sm">
         <h2 className="mb-4 text-base font-semibold text-zinc-800">
           Основные данные
@@ -503,18 +667,17 @@ export default function AdminAddPartForm({ categories }: AdminAddPartFormProps) 
             onValueChange={setTitle}
             className="w-full"
           />
-          <Input
-            label="Бренд"
-            value={brand}
-            onValueChange={setBrand}
+          <Select
+            label="Состояние"
+            selectedKeys={new Set([partCondition])}
+            onSelectionChange={(keys) =>
+              setPartCondition(getSingleSelectionKey(keys) as 'NEW' | 'USED')
+            }
             className="w-full"
-          />
-          <Input
-            label="Артикул *"
-            value={article}
-            onValueChange={setArticle}
-            className="w-full"
-          />
+          >
+            <SelectItem key="NEW">Новый</SelectItem>
+            <SelectItem key="USED">Б/У</SelectItem>
+          </Select>
           <Select
             label="Категория *"
             selectedKeys={categoryId ? new Set([categoryId]) : new Set([])}
@@ -625,12 +788,31 @@ export default function AdminAddPartForm({ categories }: AdminAddPartFormProps) 
               <AutocompleteItem key={item.id}>{item.name}</AutocompleteItem>
             ))}
           </Autocomplete>
-          <Input
+          <Autocomplete
             label="Страна производства"
-            value={manufacturerCountry}
-            onValueChange={setManufacturerCountry}
+            inputValue={manufacturerCountry}
+            onInputChange={setManufacturerCountry}
+            selectedKey={
+              countries.find(
+                (country) =>
+                  country.label.toLowerCase() === manufacturerCountry.trim().toLowerCase()
+              )?.code ?? null
+            }
+            onSelectionChange={(key) => {
+              if (!key) return;
+              const selected = countries.find((country) => country.code === String(key));
+              if (selected) setManufacturerCountry(selected.label);
+            }}
+            allowsCustomValue
+            listboxProps={{ emptyContent: 'Страны не найдены' }}
             className="w-full"
-          />
+          >
+            {filteredCountries.map((country) => (
+              <AutocompleteItem key={country.code}>
+                {country.label}
+              </AutocompleteItem>
+            ))}
+          </Autocomplete>
           {acatError && (
             <p className="md:col-span-2 text-sm text-amber-600">{acatError}</p>
           )}
@@ -689,280 +871,6 @@ export default function AdminAddPartForm({ categories }: AdminAddPartFormProps) 
 
       <section className="rounded-xl border border-zinc-200 bg-white p-5 shadow-sm">
         <div className="mb-3 flex items-center justify-between">
-          <h2 className="text-base font-semibold text-zinc-800">OEM номера</h2>
-          <button
-            type="button"
-            onClick={() => setOemNumbers((prev) => [...prev, { value: '' }])}
-            className="rounded-md border border-zinc-300 px-2.5 py-1 text-xs font-medium text-zinc-700 hover:bg-zinc-50"
-          >
-            + Добавить OEM
-          </button>
-        </div>
-        <div className="space-y-2">
-          {oemNumbers.map((item, idx) => (
-            <div key={`oem-${idx}`} className="flex gap-2">
-              <Input
-                value={item.value}
-                onValueChange={(value) =>
-                  setOemNumbers((prev) =>
-                    prev.map((row, i) =>
-                      i === idx ? { ...row, value } : row
-                    )
-                  )
-                }
-                placeholder="OEM номер"
-                className="w-full"
-              />
-              {oemNumbers.length > 1 && (
-                <button
-                  type="button"
-                  onClick={() =>
-                    setOemNumbers((prev) => prev.filter((_, i) => i !== idx))
-                  }
-                  className="rounded-md border border-zinc-300 px-2 text-xs text-zinc-600 hover:bg-zinc-50"
-                >
-                  Удалить
-                </button>
-              )}
-            </div>
-          ))}
-        </div>
-      </section>
-
-      <section className="rounded-xl border border-zinc-200 bg-white p-5 shadow-sm">
-        <div className="mb-3 flex items-center justify-between">
-          <h2 className="text-base font-semibold text-zinc-800">
-            Совместимость (авто)
-          </h2>
-          <button
-            type="button"
-            onClick={() => setCompatibility((prev) => [...prev, emptyCompatibility()])}
-            className="rounded-md border border-zinc-300 px-2.5 py-1 text-xs font-medium text-zinc-700 hover:bg-zinc-50"
-          >
-            + Добавить авто
-          </button>
-        </div>
-        <div className="space-y-3">
-          {compatibility.map((row, idx) => (
-            <div key={`cmp-${idx}`} className="grid gap-2 md:grid-cols-5">
-              <Input
-                placeholder="Марка"
-                value={row.brand}
-                onValueChange={(value) =>
-                  setCompatibility((prev) =>
-                    prev.map((r, i) =>
-                      i === idx ? { ...r, brand: value } : r
-                    )
-                  )
-                }
-              />
-              <Input
-                placeholder="Модель"
-                value={row.model}
-                onValueChange={(value) =>
-                  setCompatibility((prev) =>
-                    prev.map((r, i) =>
-                      i === idx ? { ...r, model: value } : r
-                    )
-                  )
-                }
-              />
-              <Input
-                placeholder="Годы"
-                value={row.years}
-                onValueChange={(value) =>
-                  setCompatibility((prev) =>
-                    prev.map((r, i) =>
-                      i === idx ? { ...r, years: value } : r
-                    )
-                  )
-                }
-              />
-              <Input
-                placeholder="Двигатель"
-                value={row.engine}
-                onValueChange={(value) =>
-                  setCompatibility((prev) =>
-                    prev.map((r, i) =>
-                      i === idx ? { ...r, engine: value } : r
-                    )
-                  )
-                }
-              />
-              {compatibility.length > 1 ? (
-                <button
-                  type="button"
-                  onClick={() =>
-                    setCompatibility((prev) => prev.filter((_, i) => i !== idx))
-                  }
-                  className="rounded-md border border-zinc-300 px-2 text-xs text-zinc-600 hover:bg-zinc-50"
-                >
-                  Удалить
-                </button>
-              ) : (
-                <div />
-              )}
-            </div>
-          ))}
-        </div>
-      </section>
-
-      <section className="rounded-xl border border-zinc-200 bg-white p-5 shadow-sm">
-        <div className="mb-3 flex items-center justify-between">
-          <h2 className="text-base font-semibold text-zinc-800">
-            Предложения продавцов
-          </h2>
-          <button
-            type="button"
-            onClick={() => setOffers((prev) => [...prev, emptyOffer()])}
-            className="rounded-md border border-zinc-300 px-2.5 py-1 text-xs font-medium text-zinc-700 hover:bg-zinc-50"
-          >
-            + Добавить предложение
-          </button>
-        </div>
-        <div className="space-y-3">
-          {offers.map((offer, idx) => (
-            <div key={`offer-${idx}`} className="rounded-lg border border-zinc-200 p-3">
-              <div className="grid gap-2 md:grid-cols-4">
-                <Input
-                  placeholder="Продавец"
-                  value={offer.sellerName}
-                  onValueChange={(value) =>
-                    setOffers((prev) =>
-                      prev.map((o, i) =>
-                        i === idx ? { ...o, sellerName: value } : o
-                      )
-                    )
-                  }
-                />
-                <Input
-                  placeholder="SKU"
-                  value={offer.sku}
-                  onValueChange={(value) =>
-                    setOffers((prev) =>
-                      prev.map((o, i) =>
-                        i === idx ? { ...o, sku: value } : o
-                      )
-                    )
-                  }
-                />
-                <Input
-                  type="number"
-                  min={0}
-                  placeholder="Цена"
-                  value={offer.price}
-                  onValueChange={(value) =>
-                    setOffers((prev) =>
-                      prev.map((o, i) =>
-                        i === idx ? { ...o, price: value } : o
-                      )
-                    )
-                  }
-                />
-                <Select
-                  selectedKeys={new Set([offer.currency])}
-                  onSelectionChange={(keys) =>
-                    setOffers((prev) =>
-                      prev.map((o, i) =>
-                        i === idx
-                          ? {
-                              ...o,
-                              currency: getSingleSelectionKey(keys) as Offer['currency'],
-                            }
-                          : o
-                      )
-                    )
-                  }
-                  className="w-full"
-                >
-                  <SelectItem key="AMD">AMD</SelectItem>
-                  <SelectItem key="RUB">RUB</SelectItem>
-                  <SelectItem key="USD">USD</SelectItem>
-                  <SelectItem key="EUR">EUR</SelectItem>
-                </Select>
-                <Input
-                  type="number"
-                  min={0}
-                  placeholder="Наличие"
-                  value={offer.stock}
-                  onValueChange={(value) =>
-                    setOffers((prev) =>
-                      prev.map((o, i) =>
-                        i === idx ? { ...o, stock: value } : o
-                      )
-                    )
-                  }
-                />
-                <Input
-                  type="number"
-                  min={0}
-                  placeholder="Дней доставки"
-                  value={offer.deliveryDays}
-                  onValueChange={(value) =>
-                    setOffers((prev) =>
-                      prev.map((o, i) =>
-                        i === idx ? { ...o, deliveryDays: value } : o
-                      )
-                    )
-                  }
-                />
-                <Select
-                  selectedKeys={new Set([offer.condition])}
-                  onSelectionChange={(keys) =>
-                    setOffers((prev) =>
-                      prev.map((o, i) =>
-                        i === idx
-                          ? {
-                              ...o,
-                              condition: getSingleSelectionKey(
-                                keys
-                              ) as Offer['condition'],
-                            }
-                          : o
-                      )
-                    )
-                  }
-                  className="w-full"
-                >
-                  <SelectItem key="NEW">Новый</SelectItem>
-                  <SelectItem key="USED">Б/У</SelectItem>
-                  <SelectItem key="REFURBISHED">Восстановленный</SelectItem>
-                </Select>
-                <div className="flex items-center">
-                  <Checkbox
-                    isSelected={offer.isFeatured}
-                    onValueChange={(value) =>
-                      setOffers((prev) =>
-                        prev.map((o, i) =>
-                          i === idx ? { ...o, isFeatured: value } : o
-                        )
-                      )
-                    }
-                  >
-                  Featured
-                  </Checkbox>
-                </div>
-              </div>
-              {offers.length > 1 && (
-                <div className="mt-2">
-                  <button
-                    type="button"
-                    onClick={() =>
-                      setOffers((prev) => prev.filter((_, i) => i !== idx))
-                    }
-                    className="rounded-md border border-zinc-300 px-2 py-1 text-xs text-zinc-600 hover:bg-zinc-50"
-                  >
-                    Удалить предложение
-                  </button>
-                </div>
-              )}
-            </div>
-          ))}
-        </div>
-      </section>
-
-      <section className="rounded-xl border border-zinc-200 bg-white p-5 shadow-sm">
-        <div className="mb-3 flex items-center justify-between">
           <h2 className="text-base font-semibold text-zinc-800">Медиа</h2>
           <label className="cursor-pointer rounded-md border border-zinc-300 px-2.5 py-1 text-xs font-medium text-zinc-700 hover:bg-zinc-50">
             Загрузить изображения
@@ -1016,21 +924,21 @@ export default function AdminAddPartForm({ categories }: AdminAddPartFormProps) 
       <section className="rounded-xl border border-zinc-200 bg-white p-5 shadow-sm">
         <div className="mb-3 flex items-center justify-between">
           <h2 className="text-base font-semibold text-zinc-800">
-            Дополнительные атрибуты
+            Характеристики
           </h2>
           <button
             type="button"
             onClick={() => setAttributes((prev) => [...prev, emptyAttribute()])}
             className="rounded-md border border-zinc-300 px-2.5 py-1 text-xs font-medium text-zinc-700 hover:bg-zinc-50"
           >
-            + Добавить поле
+            + Добавить характеристику
           </button>
         </div>
         <div className="space-y-2">
           {attributes.map((a, idx) => (
-            <div key={`attr-${idx}`} className="grid gap-2 md:grid-cols-3">
+            <div key={`attr-${idx}`} className="grid gap-2 md:grid-cols-12">
               <Input
-                placeholder="Ключ"
+                placeholder="Название характеристики"
                 value={a.key}
                 onValueChange={(value) =>
                   setAttributes((prev) =>
@@ -1039,6 +947,7 @@ export default function AdminAddPartForm({ categories }: AdminAddPartFormProps) 
                     )
                   )
                 }
+                className="md:col-span-4"
               />
               <Input
                 placeholder="Значение"
@@ -1050,8 +959,21 @@ export default function AdminAddPartForm({ categories }: AdminAddPartFormProps) 
                     )
                   )
                 }
-                className="md:col-span-2"
+                className="md:col-span-7"
               />
+              <button
+                type="button"
+                onClick={() =>
+                  setAttributes((prev) =>
+                    prev.length > 1
+                      ? prev.filter((_, i) => i !== idx)
+                      : [emptyAttribute()]
+                  )
+                }
+                className="md:col-span-1 rounded-md border border-zinc-300 px-2 py-1 text-xs text-zinc-600 hover:bg-zinc-50"
+              >
+                Удалить
+              </button>
             </div>
           ))}
         </div>

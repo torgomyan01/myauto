@@ -635,6 +635,14 @@ export async function searchAutopiterByNumber(
   return searchAutopiter(number);
 }
 
+export async function searchAutopiterExactQuery(
+  query: string
+): Promise<AutopiterCatalogItem[]> {
+  const raw = query.trim();
+  if (!raw) return [];
+  return findCatalogByQuery(raw);
+}
+
 export async function getAutopiterPriceByArticleId(
   articleId: number
 ): Promise<AutopiterPriceItem[]> {
